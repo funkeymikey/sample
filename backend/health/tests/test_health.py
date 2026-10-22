@@ -19,11 +19,13 @@ def test_health_returns_logged_500_when_database_is_down(
 
     from django.db import OperationalError
 
+    from core.exceptions import ErrorType
+
     with mock.patch("django.db.connection.cursor", side_effect=OperationalError("connection refused")):
         response = api_client.get(reverse("health"))
 
     assert response.status_code == 500
-    assert response.json()["error"]["type"] == "INTERNAL_ERROR"
+    assert response.json()["error"]["type"] == ErrorType.INTERNAL_ERROR
     assert "connection refused" not in response.content.decode()
     assert [record.levelno for record in caplog.records if record.name == "core.exceptions"] == [logging.ERROR]
 

@@ -89,7 +89,7 @@ describe('AccountFormView: editing an account', () => {
     const { wrapper } = await mountRoute(`/accounts/${ACCOUNT_ID}/edit`)
 
     expect(wrapper.find('[data-test="closed-notice"]').exists()).toBe(true)
-    expect(wrapper.find('form').exists()).toBe(false)
+    expect(wrapper.find('[data-test="account-form"]').exists()).toBe(false)
   })
 })
 
@@ -100,6 +100,6 @@ describe('AccountFormView: loading problems', () => {
     const { wrapper } = await mountRoute(`/accounts/${ACCOUNT_ID}/edit`)
 
     expect(wrapper.get('[data-test="load-error"]').text()).toBe('An error occurred.')
-    expect(wrapper.find('form').exists()).toBe(false)
+    expect(wrapper.find('[data-test="account-form"]').exists()).toBe(false)
   })
 })

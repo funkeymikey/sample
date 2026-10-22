@@ -4,7 +4,7 @@ import pytest
 from rest_framework.test import APIClient
 
 from core.tests.assertions import assert_documented_error
-from ledger.models import TransactionDirection
+from ledger.models import AccountStatus, TransactionDirection
 from ledger.tests.factories import AccountFactory, TransactionFactory
 
 pytestmark = pytest.mark.django_db
@@ -12,7 +12,11 @@ pytestmark = pytest.mark.django_db
 
 def test_list_returns_accounts_with_their_own_balances(api_client: APIClient, django_assert_num_queries) -> None:
     saver, spender, untouched = AccountFactory(), AccountFactory(), AccountFactory()
-    for direction, amount in [("CREDIT", "40.00"), ("DEBIT", "15.00"), ("CREDIT", "0.99")]:
+    for direction, amount in [
+        (TransactionDirection.CREDIT, "40.00"),
+        (TransactionDirection.DEBIT, "15.00"),
+        (TransactionDirection.CREDIT, "0.99"),
+    ]:
         TransactionFactory(account=saver, direction=TransactionDirection(direction), amount=Decimal(amount))
     TransactionFactory(account=spender, direction=TransactionDirection.DEBIT, amount=Decimal("60.00"))
 
@@ -73,13 +77,13 @@ def test_list_searches_and_filters(api_client: APIClient) -> None:
     assert account_numbers({"search": "lovelace"}) == ["ACCT1"]  # holder name, case-insensitive
     assert account_numbers({"search": "acct2"}) == ["ACCT2"]  # external id
     assert account_numbers({"search": "navy.mil"}) == ["ACCT2"]  # email
-    assert account_numbers({"status": "CLOSED"}) == ["ACCT2"]
+    assert account_numbers({"status": AccountStatus.CLOSED}) == ["ACCT2"]
 
 
 def test_create_account(api_client: APIClient) -> None:
     response = api_client.post(
         "/api/accounts/",
-        {"account_number": "ACCT9", "holder_name": "Ada Lovelace", "status": "CLOSED"},
+        {"account_number": "ACCT9", "holder_name": "Ada Lovelace", "status": AccountStatus.CLOSED},
         format="json",
     )
 
@@ -87,11 +91,11 @@ def test_create_account(api_client: APIClient) -> None:
 
     assert response.status_code == 201
     body = response.json()
-    assert body["status"] == "OPEN"  # status can't be set on create
+    assert body["status"] == AccountStatus.OPEN  # status can't be set on create
     assert body["email"] == ""
     assert body["balance"] == "0.00"
     saved = Account.objects.get(pk=body["id"])
-    assert (saved.account_number, saved.holder_name, saved.status) == ("ACCT9", "Ada Lovelace", "OPEN")
+    assert (saved.account_number, saved.holder_name, saved.status) == ("ACCT9", "Ada Lovelace", AccountStatus.OPEN)
 
 
 def test_create_account_generates_an_account_number_when_left_out(api_client: APIClient) -> None:
@@ -168,25 +172,27 @@ def test_account_with_a_balance_can_be_closed(api_client: APIClient) -> None:
     account = AccountFactory()
     TransactionFactory(account=account, direction=TransactionDirection.CREDIT, amount=Decimal("12.34"))
 
-    response = api_client.patch(f"/api/accounts/{account.pk}/", {"status": "CLOSED"}, format="json")
+    response = api_client.patch(f"/api/accounts/{account.pk}/", {"status": AccountStatus.CLOSED}, format="json")
 
     assert response.status_code == 200
-    assert response.json()["status"] == "CLOSED"
+    assert response.json()["status"] == AccountStatus.CLOSED
     assert response.json()["balance"] == "12.34"
 
 
 def test_patch_can_close_but_closed_is_final(api_client: APIClient) -> None:
+    from core.exceptions import ErrorType
+
     account = AccountFactory()
 
-    close_response = api_client.patch(f"/api/accounts/{account.pk}/", {"status": "CLOSED"}, format="json")
-    reopen_response = api_client.patch(f"/api/accounts/{account.pk}/", {"status": "OPEN"}, format="json")
+    close_response = api_client.patch(f"/api/accounts/{account.pk}/", {"status": AccountStatus.CLOSED}, format="json")
+    reopen_response = api_client.patch(f"/api/accounts/{account.pk}/", {"status": AccountStatus.OPEN}, format="json")
 
     assert close_response.status_code == 200
-    assert close_response.json()["status"] == "CLOSED"
+    assert close_response.json()["status"] == AccountStatus.CLOSED
     assert_documented_error(reopen_response)
     assert reopen_response.status_code == 400
     assert reopen_response.json()["error"] == {
-        "type": "VALIDATION_ERROR",
+        "type": ErrorType.VALIDATION_ERROR,
         "message": "Closed accounts can't be changed.",
     }
 

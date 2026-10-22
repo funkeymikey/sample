@@ -18,6 +18,8 @@ def parse(content: str) -> list[dict[str, str]]:
 
 
 def test_sample_uses_real_open_accounts_and_both_directions() -> None:
+    from ledger.models import TransactionDirection
+
     open_accounts = {AccountFactory().account_number for _ in range(3)}
     AccountFactory(status=AccountStatus.CLOSED)
 
@@ -25,7 +27,7 @@ def test_sample_uses_real_open_accounts_and_both_directions() -> None:
 
     assert len(rows) == 40
     assert {row["account_number"] for row in rows} <= open_accounts
-    assert {row["direction"] for row in rows} == {"CREDIT", "DEBIT"}
+    assert {row["direction"] for row in rows} == {TransactionDirection.CREDIT, TransactionDirection.DEBIT}
     assert len({row["reference_id"] for row in rows}) == 40
 
 

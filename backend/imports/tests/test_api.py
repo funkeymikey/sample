@@ -1,7 +1,9 @@
 import pytest
+from rest_framework.response import Response
 from rest_framework.test import APIClient
 
 from core.tests.assertions import assert_documented_error
+from imports.models import ImportStatus
 from imports.tests.factories import ImportBatchFactory
 from ledger.tests.factories import AccountFactory
 
@@ -10,7 +12,7 @@ pytestmark = pytest.mark.django_db
 UNKNOWN_ID = "00000000-0000-0000-0000-000000000000"
 
 
-def upload(api_client: APIClient, *lines: str):
+def upload(api_client: APIClient, *lines: str) -> Response:
     from imports.tests.csv_files import csv_upload
 
     return api_client.post("/api/imports/", {"file": csv_upload(*lines)}, format="multipart")
@@ -23,7 +25,7 @@ def test_uploading_a_valid_file(api_client: APIClient) -> None:
 
     assert response.status_code == 201
     body = response.json()
-    assert (body["status"], body["row_count"], body["error_count"]) == ("COMPLETED", 1, 0)
+    assert (body["status"], body["row_count"], body["error_count"]) == (ImportStatus.COMPLETED, 1, 0)
     assert body["original_filename"] == "transactions.csv"
     assert set(body) == {
         "id",
@@ -40,7 +42,7 @@ def test_uploading_a_file_with_bad_rows_creates_a_failed_batch(api_client: APICl
     response = upload(api_client, "9999,CREDIT,10.00,2026-09-01,REF-1,")
 
     assert response.status_code == 201  # the batch was created; its status says it failed
-    assert (response.json()["status"], response.json()["error_count"]) == ("FAILED", 1)
+    assert (response.json()["status"], response.json()["error_count"]) == (ImportStatus.FAILED, 1)
 
 
 def test_problems_with_the_file_itself_are_a_400(api_client: APIClient) -> None:
@@ -55,7 +57,6 @@ def test_problems_with_the_file_itself_are_a_400(api_client: APIClient) -> None:
 
 
 def test_listing_and_viewing_imports(api_client: APIClient) -> None:
-
     older = ImportBatchFactory(original_filename="older.csv")
     newer = ImportBatchFactory(original_filename="newer.csv")
 
@@ -181,11 +182,13 @@ def test_listing_imports_never_loads_their_files(api_client: APIClient, django_a
 
 
 def test_an_upload_that_isnt_multipart_is_a_415(api_client: APIClient) -> None:
+    from core.exceptions import ErrorType
+
     response = api_client.post("/api/imports/", {"file": "account_number,direction"}, format="json")
 
     assert_documented_error(response)
     assert response.status_code == 415
-    assert response.json()["error"]["type"] == "UNSUPPORTED_MEDIA_TYPE"
+    assert response.json()["error"]["type"] == ErrorType.UNSUPPORTED_MEDIA_TYPE
 
 
 @pytest.mark.parametrize("rows", [1, 1000])

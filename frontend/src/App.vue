@@ -27,7 +27,7 @@ onMounted(async () => {
   <header class="app-header">
     <div class="app-header-inner">
       <RouterLink to="/accounts" class="brand" data-test="home-link">
-        <img src="/icons8-money-box-ios-27-filled-32.png" alt="" width="20" height="20" />
+        <img src="/logo.svg" alt="" width="20" height="20" />
         Ledger
       </RouterLink>
       <nav class="app-nav">

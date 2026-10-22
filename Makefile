@@ -30,11 +30,7 @@ init:
 	command -v uv >/dev/null || brew install uv
 	command -v volta >/dev/null || { brew install volta && volta setup; }
 	command -v docker >/dev/null || brew install --cask docker-desktop
-	@docker info >/dev/null 2>&1 || { \
-		echo "Starting Docker Desktop (first launch asks you to accept the license)..."; \
-		open -a Docker; \
-		until docker info >/dev/null 2>&1; do sleep 2; done; \
-	}
+	$(MAKE) docker
 	cd backend && uv python install
 	[ -f .env ] || cp .env.example .env
 	$(MAKE) install
@@ -53,13 +49,24 @@ upgrade:
 
 # --- Docker ---------------------------------------------------------------
 
+# Start Docker Desktop if it isn't running, and wait until it's ready.
+.PHONY: docker
+docker:
+	@docker info >/dev/null 2>&1 || { \
+		echo "Starting Docker Desktop (first launch asks you to accept the license)..."; \
+		open -a Docker; \
+		until docker info >/dev/null 2>&1; do sleep 2; done; \
+	}
+
+# Start Postgres and wait until it's healthy. Every target that needs the database depends on this, so
+# there's no separate step to remember; when it's already running, this takes well under a second.
 .PHONY: db
-db:
+db: docker
 	docker compose up -d --wait db
 
 .PHONY: up
-up:
-	docker compose up --build --renew-anon-volumes
+up: docker
+	docker compose up --build
 
 .PHONY: down
 down:
@@ -68,7 +75,7 @@ down:
 # --- Local dev servers ----------------------------------------------------
 
 .PHONY: backend
-backend:
+backend: db
 	$(MANAGE) runserver $(BACKEND_PORT)
 
 .PHONY: frontend
@@ -78,19 +85,19 @@ frontend:
 # --- Database -------------------------------------------------------------
 
 .PHONY: migrate
-migrate:
+migrate: db
 	$(MANAGE) migrate
 
 .PHONY: makemigrations
-makemigrations:
+makemigrations: db
 	$(MANAGE) makemigrations
 
 .PHONY: lint-migrations
-lint-migrations:
+lint-migrations: db
 	$(MANAGE) lintmigrations --unapplied-migrations --quiet ignore
 
 .PHONY: seed
-seed:
+seed: db
 	$(MANAGE) seed_demo
 
 # --- Tests ----------------------------------------------------------------
@@ -99,22 +106,22 @@ seed:
 test: test-be test-fe
 
 .PHONY: test-be
-test-be:
+test-be: db
 	$(UV) pytest -n auto --reuse-db $(PYTEST_COV)
 	date
 
 # run the tests without coverage tracking for quicker execution
 .PHONY: test-nc
-test-nc:
+test-nc: db
 	$(UV) pytest -n auto --reuse-db
 
 .PHONY: test-serial
-test-serial:
+test-serial: db
 	$(UV) pytest --reuse-db $(PYTEST_COV)
 	date
 
 .PHONY: test-new-db
-test-new-db:
+test-new-db: db
 	$(UV) pytest -n auto --create-db $(PYTEST_COV)
 	date
 

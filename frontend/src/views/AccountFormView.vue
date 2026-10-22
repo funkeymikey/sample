@@ -74,7 +74,7 @@ function save() {
     </Message>
 
     <section v-else-if="!isEditing || existingAccount">
-      <form class="form" novalidate @submit.prevent="save">
+      <form class="form" novalidate data-test="account-form" @submit.prevent="save">
         <Message v-if="formError" severity="error" data-test="form-error">{{ formError }}</Message>
 
         <div class="field">

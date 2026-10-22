@@ -102,7 +102,7 @@ describe('TransactionFormView', () => {
     const { wrapper } = await mountRoute(FORM_PATH)
 
     expect(wrapper.find('[data-test="closed-notice"]').exists()).toBe(true)
-    expect(wrapper.find('form').exists()).toBe(false)
+    expect(wrapper.find('[data-test="transaction-form"]').exists()).toBe(false)
   })
 })
 
@@ -113,6 +113,6 @@ describe('TransactionFormView: loading problems', () => {
     const { wrapper } = await mountRoute(FORM_PATH)
 
     expect(wrapper.get('[data-test="load-error"]').text()).toBe('An error occurred.')
-    expect(wrapper.find('form').exists()).toBe(false)
+    expect(wrapper.find('[data-test="transaction-form"]').exists()).toBe(false)
   })
 })

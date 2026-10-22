@@ -1,6 +1,6 @@
 # Code Sample: Plan
 
-A small, well-built CRUD app with bulk file upload. It is a portfolio piece, so the aim is clean structure, sensible validation, and good tests, not a long feature list.
+A small, well-built CRUD app with bulk file upload. The aim is clean structure, real-world organization, sensible validation, and good tests, not a long feature list. It also will make keep the stack small - ie, everything's synchronous, there's no celery running async file imports.
 
 **Stack:** Django + Django REST Framework (API), Vue 3 + Vite (frontend), PostgreSQL (database), Docker Compose (local dev).
 
@@ -12,7 +12,7 @@ A small, well-built CRUD app with bulk file upload. It is a portfolio piece, so 
 
 The app is a small ledger.
 
-- **Account**: works like a bank account: it holds money, and goes negative when it owes. In banking terms, a customer's deposit account. In PeopleSoft terms, a student account keyed by EMPLID.
+- **Account**: works like a bank account: it holds money, and goes negative when it owes. In banking terms, a customer's deposit account.
 - **Transaction**: money in or out of an account. A **credit** (deposit, payment, financial aid) increases the balance; a **debit** (withdrawal, charge, fee) decreases it.
 
 The UI uses these neutral names throughout.
@@ -80,7 +80,7 @@ The account **balance** is computed (credits minus debits: positive is money hel
 ### Bulk upload (all-or-nothing)
 
 - Upload a CSV of transactions with the columns `account_number, direction, amount, transaction_date, reference_id, description`. Unlike the form, imports require `reference_id`: re-importing the same file must not post anything twice.
-- Problems with the file itself (over 5 MB or 10,000 rows, not UTF-8, malformed, empty, missing a required column) are a 400 with a clear message, and no batch is created. Unknown columns are ignored; header names are case-insensitive, Excel's byte order mark is handled, and blank rows (including the comma-only rows spreadsheets export) are skipped. Errors report each row's real line in the file.
+- Problems with the file itself (over 5 MB or 10,000 rows, not UTF-8, malformed, empty, missing a required column) are a 400 with a clear message, and no batch is created. Unknown columns are ignored; header names are case-insensitive, CSVs saved from Excel read correctly, and blank rows (including the comma-only rows spreadsheets export) are skipped. Errors report each row's real line in the file.
 - The pipeline has four steps:
   1. **Parse** the file. It fails fast if the file is malformed or headers are missing.
   2. **Validate every row** and collect all errors, rather than stopping at the first one. Validation reuses the same DRF serializer as single-record create, so there's one source of truth.
@@ -96,7 +96,6 @@ The account **balance** is computed (credits minus debits: positive is money hel
 - The file is generated on the fly by `GET /api/imports/sample.csv?rows=25` (1 to 1,000 rows). It uses real account numbers from the DB, a mix of debits and credits, plus fresh unique `reference_id`s. That way the file passes validation and uploads successfully as-is, which makes the demo work end to end.
 - `?invalid=true` produces a file with a few deliberate errors (an unknown account, a negative amount, a bad date, a duplicate reference), to demo the failure path.
 - If there are no open accounts, the endpoint returns a clear 400 telling the user to open one first.
-- Static copies of both files are also committed in `samples/` for the README and tests.
 
 ### Sync vs. async (Celery)
 
@@ -127,14 +126,14 @@ GET                /api/imports/sample.csv    (?rows=N&invalid=true)
 
 - OpenAPI schema with drf-spectacular, Redoc at `/api/docs/`.
 - Pagination and filtering with django-filter.
-- **Errors (done in Milestone 1):** every error returns `{"error": {"type", "message", "detail"?, "fields"?}}`. Business logic raises `core.exceptions.ApiError` (a 400) or `ConflictError` (a 409); unknown ids are DRF's own 404s. The exception handler reshapes DRF's own errors, and turns anything unexpected into a generic, logged 500. `core.schema.ApiAutoSchema` documents the defaults on every endpoint: 500 everywhere, 400 on writes, and 404 on single-object paths. Views only declare unusual codes, such as a 409.
+- **Errors:** every error returns `{"error": {"type", "message", "detail"?, "fields"?}}`. Business logic raises `core.exceptions.ApiError` (a 400) or `ConflictError` (a 409); unknown ids are DRF's own 404s. The exception handler reshapes DRF's own errors, and turns anything unexpected into a generic, logged 500. `core.schema.ApiAutoSchema` documents the defaults on every endpoint: 500 everywhere, 400 on writes, and 404 on single-object paths. Views only declare unusual codes, such as a 409.
 - No authentication for now.
 
 ---
 
 ## 4. Frontend (Vue 3)
 
-- Vite, Vue 3 Composition API with `<script setup>`, TypeScript, Vue Router. No Pinia: each screen loads its own data, and nothing is shared across views. Add it only if that changes.
+- Vite, Vue 3 Composition API with `<script setup>`, TypeScript, Vue Router. In this simple app, no need for central store with shared state.
 - UI kit: PrimeVue 4 (Aura theme), because its DataTable suits this kind of app.
 - Views: Accounts list, Account detail (with the account's transactions), Account form (open and edit), Transaction form, Transaction detail, Import upload (with the "Download sample file" button), Import results, Import history.
 - Money is never a JavaScript number: amounts stay decimal strings from the API to the screen (`Intl.NumberFormat` formats the string exactly), and typed amounts become 2-decimal strings before they're sent.
@@ -152,7 +151,6 @@ GET                /api/imports/sample.csv    (?rows=N&invalid=true)
 │   ├── health/            # health check endpoint
 │   ├── ledger/            # accounts, transactions
 │   ├── imports/           # upload pipeline, sample file generator
-│   │                      # each app keeps its tests in <app>/tests/
 │   ├── .python-version    # 3.13, read by uv
 │   ├── pyproject.toml     # deps (uv), ruff, pytest, coverage config
 │   ├── uv.lock
@@ -161,7 +159,6 @@ GET                /api/imports/sample.csv    (?rows=N&invalid=true)
 │   ├── src/
 │   ├── package.json       # Node version pinned with Volta
 │   └── Dockerfile
-├── samples/               # static valid and invalid CSVs
 ├── plans/PLAN.md
 ├── .env.example           # DATABASE_URL etc.; copied to .env by make init
 ├── .gitignore
@@ -171,6 +168,8 @@ GET                /api/imports/sample.csv    (?rows=N&invalid=true)
 ├── CLAUDE.md
 └── README.md
 ```
+
+Note: each django app keeps its tests in `<app>/tests/`
 
 ---
 
@@ -184,21 +183,21 @@ A single root Makefile drives both halves. Backend commands run via `uv run --di
 
 Local ports avoid clashing with other projects: Postgres on 5433, the API on 8001, Vite on 5173.
 
-| Target                                         | What it does                                                                                                                                                               |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `init`                                         | First-time setup: install uv, Volta and Docker Desktop with Homebrew if missing (and start Docker), `uv python install`, copy `.env.example` to `.env`, then run `install` |
-| `install`                                      | `uv sync`, `npm ci`, `pre-commit install`. Rerun after pulling                                                                                                             |
-| `upgrade`                                      | `uv lock --upgrade`, `npm update`, `pre-commit autoupdate`                                                                                                                 |
-| `db` / `up` / `down`                           | Start Postgres only / start the full stack / stop everything                                                                                                               |
-| `backend` / `frontend`                         | Run the Django dev server / the Vite dev server locally                                                                                                                    |
-| `migrate`, `makemigrations`, `lint-migrations` | Run locally against Docker Postgres; `lint-migrations` uses django-migration-linter                                                                                        |
-| `seed`                                         | `manage.py seed_demo`                                                                                                                                                      |
-| `test`                                         | `pytest -n auto --reuse-db --cov` + coverage report, then `test-fe`                                                                                                        |
-| `test-be`, `test-fe`                           | Backend only / Vitest only                                                                                                                                                 |
-| `test-nc`, `test-serial`, `test-new-db`        | Same as your current targets, mapped to pytest flags (no `--cov` / no `-n` / `--create-db`)                                                                                |
-| `lint`                                         | `pre-commit run --all-files`                                                                                                                                               |
-| `api-types`                                    | Export the OpenAPI schema and regenerate the frontend's TypeScript types                                                                                                   |
-| `clean-coverage`                               | Delete coverage artifacts                                                                                                                                                  |
+| Target                                         | What it does                                                                                             |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `init`                                         | First-time setup: install and initialize dependencies, copy `.env.example` to `.env`, then run `install` |
+| `install`                                      | `uv sync`, `npm ci`, `pre-commit install`. Rerun after pulling                                           |
+| `upgrade`                                      | `uv lock --upgrade`, `npm update`, `pre-commit autoupdate`                                               |
+| `db` / `up` / `down`                           | Start Postgres only / start the full stack / stop everything                                             |
+| `backend` / `frontend`                         | Run the Django dev server / the Vite dev server locally                                                  |
+| `migrate`, `makemigrations`, `lint-migrations` | Run locally against Docker Postgres; `lint-migrations` uses django-migration-linter                      |
+| `seed`                                         | `manage.py seed_demo`                                                                                    |
+| `test`                                         | `pytest -n auto --reuse-db --cov` + coverage report, then `test-fe`                                      |
+| `test-be`, `test-fe`                           | Backend only / Vitest only                                                                               |
+| `test-nc`, `test-serial`, `test-new-db`        | Same as your current targets, mapped to pytest flags (no `--cov` / no `-n` / `--create-db`)              |
+| `lint`                                         | `pre-commit run --all-files`                                                                             |
+| `api-types`                                    | Export the OpenAPI schema and regenerate the frontend's TypeScript types                                 |
+| `clean-coverage`                               | Delete coverage artifacts                                                                                |
 
 ### Pre-commit (`.pre-commit-config.yaml` at the repo root)
 
@@ -232,13 +231,13 @@ The README is written in Milestone 1 so setup instructions exist from day one. I
 
 ## 8. Milestones
 
-1. **Scaffold**: Docker Compose with Postgres, Django project (uv), Vite app (Volta), Makefile, pre-commit, `.env.example`, `.gitignore`, and README (setup part). Done when a fresh clone runs `make init && make db && make migrate && make test && make lint` cleanly.
+1. **Scaffold** (done): Docker Compose with Postgres, Django project (uv), Vite app (Volta), Makefile, pre-commit, `.env.example`, `.gitignore`, and README (setup part). Done when a fresh clone runs `make init && make db && make migrate && make test && make lint` cleanly.
 2. **Core** (done): abstract `BaseModel` (UUID primary key, timestamps) with tests.
 3. **Domain + API** (done): `ledger` app with Account and Transaction models, migration, services, DRF endpoints and tests. Transactions are listed and posted under their account (`/api/accounts/{id}/transactions/`); there's no all-transactions list. Posting to or editing a closed account is a 400; reposting a `reference_id` (a genuine clash) is a 409. Services lock the account row, so concurrent requests can't bypass the closed-account rule.
 4. **Frontend CRUD** (done): accounts list (server-side paging, search, status filter, sorting), account detail with its transactions (direction and date filters) and close-with-confirmation, account form (open and edit), transaction form, transaction detail. API field errors show next to their fields; tests sit beside each view. Search, filters, sort and page live in the URL (e.g. `/accounts?status=CLOSED&ordering=-balance&page=2`, `/accounts/{id}?direction=DEBIT&from=2026-09-01`), so refresh, shared links and Back restore them; invalid values are ignored, and a page that no longer exists falls back to page 1.
 5. **Bulk upload backend** (done): `imports` app with ImportBatch and ImportRowError, `Transaction.import_batch`, parser, all-or-nothing validation reusing the transaction serializer, lock-free validation then a short locked re-check and bulk insert, error CSV, sample file generator, tests.
 6. **Bulk upload frontend** (done): upload (drop zone, column guide, sample downloads), results (summary, row errors, error CSV), history; header nav for Accounts and Imports.
-7. **Polish**: seed command, static sample files, README, screenshots.
+7. **Polish** (done): `seed_demo` command (`make seed`), README with design decisions, a frontend container that reinstalls dependencies when `package-lock.json` changes, and a pass over the code for the CLAUDE.md conventions.
 
 ---
 

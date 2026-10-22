@@ -5,7 +5,7 @@ import pytest
 from rest_framework.test import APIClient
 
 from core.tests.assertions import assert_documented_error
-from ledger.models import AccountStatus, Transaction
+from ledger.models import AccountStatus, Transaction, TransactionDirection
 from ledger.tests.factories import AccountFactory, TransactionFactory
 
 pytestmark = pytest.mark.django_db
@@ -19,7 +19,7 @@ def transactions_url(account_id: Any) -> str:
 
 def transaction_payload(**overrides: Any) -> dict[str, Any]:
     return {
-        "direction": "DEBIT",
+        "direction": TransactionDirection.DEBIT,
         "amount": "125.50",
         "transaction_date": "2026-09-01",
         "reference_id": "REF-1",
@@ -110,6 +110,8 @@ def test_posting_to_an_unknown_account_is_a_404(api_client: APIClient) -> None:
 
 
 def test_closed_account_cannot_receive_transactions(api_client: APIClient) -> None:
+    from core.exceptions import ErrorType
+
     account = AccountFactory(status=AccountStatus.CLOSED)
 
     response = api_client.post(transactions_url(account.pk), transaction_payload(), format="json")
@@ -117,7 +119,7 @@ def test_closed_account_cannot_receive_transactions(api_client: APIClient) -> No
     assert_documented_error(response)
     assert response.status_code == 400
     assert response.json()["error"] == {
-        "type": "VALIDATION_ERROR",
+        "type": ErrorType.VALIDATION_ERROR,
         "message": "Closed accounts can't receive transactions.",
     }
     assert Transaction.objects.count() == 0
@@ -150,7 +152,11 @@ def test_list_shows_only_that_account_filtered_by_direction_and_date(
     with django_assert_num_queries(3):  # account lookup + count + page, however many rows
         response = api_client.get(
             transactions_url(account.pk),
-            {"direction": "CREDIT", "transaction_date_after": "2026-09-01", "transaction_date_before": "2026-09-30"},
+            {
+                "direction": TransactionDirection.CREDIT,
+                "transaction_date_after": "2026-09-01",
+                "transaction_date_before": "2026-09-30",
+            },
         )
 
     assert response.status_code == 200
@@ -224,12 +230,12 @@ def test_description_is_optional(api_client: APIClient) -> None:
 def test_posted_transactions_add_up_to_the_account_balance(api_client: APIClient) -> None:
     account = AccountFactory()
     postings = [
-        ("CREDIT", "1000.00"),  # paycheck
-        ("DEBIT", "64.37"),  # groceries
-        ("DEBIT", "1200.00"),  # rent: overdrawn
-        ("CREDIT", "300.00"),  # transfer in
-        ("DEBIT", "0.63"),  # fee
-        ("CREDIT", "15.01"),  # refund
+        (TransactionDirection.CREDIT, "1000.00"),  # paycheck
+        (TransactionDirection.DEBIT, "64.37"),  # groceries
+        (TransactionDirection.DEBIT, "1200.00"),  # rent: overdrawn
+        (TransactionDirection.CREDIT, "300.00"),  # transfer in
+        (TransactionDirection.DEBIT, "0.63"),  # fee
+        (TransactionDirection.CREDIT, "15.01"),  # refund
     ]
 
     for number, (direction, amount) in enumerate(postings, start=1):

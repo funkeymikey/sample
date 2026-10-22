@@ -48,23 +48,23 @@ DRF_STATUS_ERROR_TYPE = {
 class ApiError(Exception):
     """An error that reaches the client as a 4xx: a 400 `VALIDATION_ERROR` unless a subclass says otherwise.
 
-    Callers can override the default message and add a `detail`.
+    `message` says what went wrong; an optional `detail` says more, such as how to fix it.
     """
 
     status_code = HTTPStatus.BAD_REQUEST
     error_type = ErrorType.VALIDATION_ERROR
-    default_message = VALIDATION_ERROR_MESSAGE
 
-    def __init__(self, message: str | None = None, *, detail: str | None = None) -> None:
-        self.message = message or self.default_message
+    def __init__(self, message: str, *, detail: str | None = None) -> None:
+        self.message = message
         self.detail = detail
-        super().__init__(self.message)
+        super().__init__(message)
 
 
 class ConflictError(ApiError):
+    """A 409 `CONFLICT`: the request clashes with existing data, such as a reused reference."""
+
     status_code = HTTPStatus.CONFLICT
     error_type = ErrorType.CONFLICT
-    default_message = "A conflict occurred trying to perform this action."
 
 
 def api_exception_handler(exception: Exception, context: dict[str, Any]) -> Response:

@@ -1,3 +1,5 @@
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 from unittest import mock
 
 import pytest
@@ -8,7 +10,7 @@ from core.exceptions import ApiError
 from imports.models import ImportBatch, ImportStatus
 from imports.services import import_transactions
 from imports.tests.csv_files import csv_upload
-from ledger.models import AccountStatus, Transaction
+from ledger.models import AccountStatus, Transaction, TransactionDirection
 from ledger.tests.factories import AccountFactory, TransactionFactory
 
 pytestmark = pytest.mark.django_db
@@ -78,7 +80,7 @@ def test_any_invalid_row_fails_the_whole_file_and_posts_nothing() -> None:
     first_error = batch.row_errors.get(row_number=3)
     assert first_error.raw_data == {
         "account_number": "9999",
-        "direction": "CREDIT",
+        "direction": TransactionDirection.CREDIT,
         "amount": "1.00",
         "transaction_date": "2026-09-01",
         "reference_id": "REF-2",
@@ -135,7 +137,6 @@ def test_a_byte_order_mark_from_excel_is_ignored() -> None:
     ids=["empty", "header only", "missing columns", "not text"],
 )
 def test_problems_with_the_file_itself_are_rejected_without_a_batch(upload: SimpleUploadedFile, message: str) -> None:
-
     with pytest.raises(ApiError, match=message):
         import_transactions(upload)
     assert ImportBatch.objects.count() == 0
@@ -248,13 +249,13 @@ def test_errors_report_the_real_line_in_the_file_even_after_blank_lines() -> Non
     assert [row_error.row_number for row_error in batch.row_errors.all()] == [5]
 
 
-def run_between_validation_and_writing(action):
+def run_between_validation_and_writing(action: Callable[[], object]) -> AbstractContextManager[mock.MagicMock]:
     """Patch the import so `action` runs after validation finishes but before anything is written."""
     from imports import services
 
     real_validate_rows = services.validate_rows
 
-    def validate_then_act(*args, **kwargs):
+    def validate_then_act(*args: object, **kwargs: object) -> object:
         result = real_validate_rows(*args, **kwargs)
         action()
         return result

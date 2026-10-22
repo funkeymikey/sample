@@ -7,5 +7,5 @@ HEADER = "account_number,direction,amount,transaction_date,reference_id,descript
 
 def csv_upload(*lines: str, header: str = HEADER, name: str = "transactions.csv") -> SimpleUploadedFile:
     """An uploaded CSV file with `header` and then `lines`."""
-    content = "\n".join([header, *lines]) + "\n"
+    content = "\n".join([header, *lines, ""])  # ends with a newline
     return SimpleUploadedFile(name, content.encode(), content_type="text/csv")

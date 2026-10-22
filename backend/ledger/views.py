@@ -111,7 +111,6 @@ class AccountTransactionListView(generics.ListCreateAPIView):
         The other views can set `queryset = ...` once, up front. This one can't, because it doesn't know
         which account to show until a request arrives with an account id in the URL.
         """
-
         # When building the API docs, drf-spectacular calls this method without a real request, so there's
         # no account id to look up. Returning an empty result lets it document the endpoint without crashing.
         if getattr(self, "swagger_fake_view", False):

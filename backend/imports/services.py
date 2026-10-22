@@ -58,7 +58,6 @@ def import_transactions(upload: UploadedFile) -> ImportBatch:
     locked only for the short write at the end (see `post_rows`), which re-checks anything that could have
     changed since validation.
     """
-
     from imports.models import ImportFile
 
     content = read_upload(upload)
@@ -92,7 +91,6 @@ def post_rows(batch: ImportBatch, valid_rows: list["ValidRow"]) -> list["RowProb
     deadlock) and both are re-checked. Posting and closing take the same account locks, so once these checks
     pass, nothing can change them before the insert commits.
     """
-
     from ledger.models import AccountStatus
 
     account_ids = {valid.data["account"].pk for valid in valid_rows}
@@ -128,7 +126,6 @@ def post_rows(batch: ImportBatch, valid_rows: list["ValidRow"]) -> list["RowProb
 
 def fail_with_problems(batch: ImportBatch, problems: list["RowProblem"]) -> None:
     """Save the row errors and mark the batch FAILED. Nothing was posted."""
-
     from imports.models import ImportRowError
 
     with db_transaction.atomic():

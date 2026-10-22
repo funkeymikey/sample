@@ -78,21 +78,15 @@ def test_default_error_responses_use_the_error_schema(item_schema: dict[str, Any
 
 
 def test_error_schema_documents_the_error_shape(item_schema: dict[str, Any]) -> None:
+    from core.exceptions import ErrorType
+
     components = item_schema["components"]["schemas"]
 
     assert components["ErrorResponse"]["properties"]["error"] == {"$ref": "#/components/schemas/Error"}
     assert set(components["Error"]["properties"]) == {"type", "message", "detail", "fields"}
     assert set(components["Error"]["required"]) == {"type", "message"}
     assert "description" not in components["ErrorTypeEnum"]  # no redundant "* `A` - A" bullets
-    assert components["ErrorTypeEnum"]["enum"] == [
-        "VALIDATION_ERROR",
-        "NOT_FOUND",
-        "METHOD_NOT_ALLOWED",
-        "CONFLICT",
-        "UNSUPPORTED_MEDIA_TYPE",
-        "REQUEST_ERROR",
-        "INTERNAL_ERROR",
-    ]
+    assert components["ErrorTypeEnum"]["enum"] == list(ErrorType)
 
 
 def test_explicit_responses_are_kept(item_schema: dict[str, Any]) -> None:

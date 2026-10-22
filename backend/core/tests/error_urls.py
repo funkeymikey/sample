@@ -19,7 +19,7 @@ class RaisingView(APIView):
 
     exceptions = {
         "conflict": lambda: ConflictError("Account is closed.", detail="Closed accounts can't receive transactions."),
-        "api-error": lambda: ApiError(),
+        "api-error": lambda: ApiError("Amount is too large."),
         "django-404": lambda: Http404("No account with that id."),
         "django-404-no-message": lambda: Http404(),
         "unexpected": lambda: RuntimeError("secret internal detail"),

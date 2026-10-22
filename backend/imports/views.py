@@ -120,10 +120,9 @@ class ImportFileView(APIView):
         from imports.models import ImportFile
 
         batch = generics.get_object_or_404(ImportBatch, pk=pk)
-        try:
-            content = ImportFile.objects.values_list("content", flat=True).get(batch=batch)
-        except ImportFile.DoesNotExist as error:
-            raise NotFound("The original file wasn't kept for this import.") from error
+        content = ImportFile.objects.filter(batch=batch).values_list("content", flat=True).first()
+        if content is None:
+            raise NotFound("The original file wasn't kept for this import.")
         response = HttpResponse(bytes(content), content_type="text/csv")
         response["Content-Disposition"] = f'attachment; filename="{batch.original_filename}"'
         return response

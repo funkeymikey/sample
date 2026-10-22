@@ -3,7 +3,7 @@ from unittest import mock
 import pytest
 
 from core.exceptions import ApiError
-from ledger.models import Account, AccountStatus, Transaction
+from ledger.models import Account, AccountStatus, Transaction, TransactionDirection
 from ledger.services import create_account, update_account
 from ledger.tests.factories import AccountFactory, TransactionFactory
 
@@ -28,7 +28,6 @@ def post(account: Account, reference_id: str = "REF-1") -> Transaction:
 
 
 def test_create_account_starts_open() -> None:
-
     account = create_account(account_number="ACCT1", holder_name="Ada Lovelace", email="ada@example.com")
 
     assert account.status == AccountStatus.OPEN
@@ -60,7 +59,12 @@ def test_post_transaction_creates_it() -> None:
 
     saved = Transaction.objects.get()
     assert saved == transaction
-    assert (saved.account, saved.direction, saved.amount, saved.reference_id) == (account, "DEBIT", 25, "REF-1")
+    assert (saved.account, saved.direction, saved.amount, saved.reference_id) == (
+        account,
+        TransactionDirection.DEBIT,
+        25,
+        "REF-1",
+    )
 
 
 def test_closed_account_cannot_receive_transactions() -> None:
@@ -83,7 +87,6 @@ def test_duplicate_reference_is_a_conflict() -> None:
 
 
 def test_create_account_generates_an_account_number_when_none_is_given() -> None:
-
     account = create_account(holder_name="Ada Lovelace")
 
     assert len(account.account_number) == 10
@@ -109,7 +112,6 @@ def test_post_transaction_generates_a_reference_when_none_is_given() -> None:
 
 
 def test_generated_reference_retries_on_a_collision() -> None:
-
     existing = TransactionFactory(reference_id="TXN-AAAAAAAA")
 
     with mock.patch("ledger.services.generate_reference_id", side_effect=["TXN-AAAAAAAA", "TXN-BBBBBBBB"]):
@@ -119,7 +121,6 @@ def test_generated_reference_retries_on_a_collision() -> None:
 
 
 def test_generation_gives_up_after_repeated_collisions() -> None:
-
     from ledger.services import GENERATION_ATTEMPTS, create_account
 
     AccountFactory(account_number="1111111111")

@@ -3,6 +3,7 @@ import logging
 import pytest
 from rest_framework.test import APIClient
 
+from core.exceptions import ErrorType
 from core.tests.assertions import assert_documented_error
 
 pytestmark = pytest.mark.urls("core.tests.error_urls")
@@ -20,7 +21,7 @@ def test_api_error_returns_its_status_and_message(api_client: APIClient, caplog:
     assert response.status_code == 409
     assert response.json() == {
         "error": {
-            "type": "CONFLICT",
+            "type": ErrorType.CONFLICT,
             "message": "Account is closed.",
             "detail": "Closed accounts can't receive transactions.",
         }
@@ -28,12 +29,12 @@ def test_api_error_returns_its_status_and_message(api_client: APIClient, caplog:
     assert handler_log_levels(caplog) == [logging.WARNING]
 
 
-def test_plain_api_error_is_a_400_with_default_message(api_client: APIClient) -> None:
+def test_api_error_is_a_400_validation_error_by_default(api_client: APIClient) -> None:
     response = api_client.get("/raise/api-error/")
 
     assert_documented_error(response)
     assert response.status_code == 400
-    assert response.json() == {"error": {"type": "VALIDATION_ERROR", "message": "Invalid request data."}}
+    assert response.json() == {"error": {"type": ErrorType.VALIDATION_ERROR, "message": "Amount is too large."}}
 
 
 def test_django_404_uses_error_shape(api_client: APIClient) -> None:
@@ -42,9 +43,9 @@ def test_django_404_uses_error_shape(api_client: APIClient) -> None:
 
     assert_documented_error(response)
     assert response.status_code == 404
-    assert response.json()["error"] == {"type": "NOT_FOUND", "message": "No account with that id."}
+    assert response.json()["error"] == {"type": ErrorType.NOT_FOUND, "message": "No account with that id."}
     assert_documented_error(no_message_response)
-    assert no_message_response.json()["error"] == {"type": "NOT_FOUND", "message": "Not found."}
+    assert no_message_response.json()["error"] == {"type": ErrorType.NOT_FOUND, "message": "Not found."}
 
 
 def test_validation_error_lists_field_errors(api_client: APIClient) -> None:
@@ -54,7 +55,7 @@ def test_validation_error_lists_field_errors(api_client: APIClient) -> None:
     assert response.status_code == 400
     assert response.json() == {
         "error": {
-            "type": "VALIDATION_ERROR",
+            "type": ErrorType.VALIDATION_ERROR,
             "message": "Invalid request data.",
             "fields": {"external_id": ["This field is required."]},
         }
@@ -75,10 +76,10 @@ def test_other_drf_errors_use_error_shape(api_client: APIClient) -> None:
 
     assert_documented_error(method_response)
     assert method_response.status_code == 405
-    assert method_response.json()["error"]["type"] == "METHOD_NOT_ALLOWED"
+    assert method_response.json()["error"]["type"] == ErrorType.METHOD_NOT_ALLOWED
     assert_documented_error(parse_response)
     assert parse_response.status_code == 400
-    assert parse_response.json()["error"]["type"] == "VALIDATION_ERROR"
+    assert parse_response.json()["error"]["type"] == ErrorType.VALIDATION_ERROR
 
 
 def test_unexpected_error_returns_generic_500_and_logs_traceback(
@@ -89,7 +90,7 @@ def test_unexpected_error_returns_generic_500_and_logs_traceback(
     assert_documented_error(response)
     assert response.status_code == 500
     assert response.json() == {
-        "error": {"type": "INTERNAL_ERROR", "message": "An error occurred while handling your request."}
+        "error": {"type": ErrorType.INTERNAL_ERROR, "message": "An error occurred while handling your request."}
     }
     assert "secret internal detail" not in response.content.decode()
     assert handler_log_levels(caplog) == [logging.ERROR]
