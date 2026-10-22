@@ -12,17 +12,14 @@ A small, well-built CRUD app with bulk file upload. It is a portfolio piece, so 
 
 The app is a small ledger.
 
-- **Account**: who owes or holds money. In PeopleSoft terms, a student account keyed by EMPLID. In banking terms, a customer account.
-- **Transaction**: a charge, payment, or adjustment posted to an account. Each transaction is either a debit (increases what the account owes) or a credit (decreases it).
+- **Account**: works like a bank account: it holds money, and goes negative when it owes. In banking terms, a customer's deposit account. In PeopleSoft terms, a student account keyed by EMPLID.
+- **Transaction**: money in or out of an account. A **credit** (deposit, payment, financial aid) increases the balance; a **debit** (withdrawal, charge, fee) decreases it.
 
 The UI uses these neutral names throughout.
 
 ### Base models
 
-Every table inherits from shared abstract base classes in `core/models.py`:
-
-- **`TimeStampedModel`** adds `created_at` and `updated_at`.
-- **`BaseModel`** extends it with a UUID primary key. Every model uses it.
+Every model inherits from one abstract base class in `core/models.py`: **`BaseModel`**, which adds a UUID primary key plus `created_at` and `updated_at`.
 
 Deleting is not supported. The ledger is immutable and accounts are closed rather than deleted.
 
@@ -30,7 +27,7 @@ Deleting is not supported. The ledger is immutable and accounts are closed rathe
 
 ```
 Account (BaseModel)
-  external_id       str                # EMPLID / customer number; unique, read-only after create
+  external_id       str                # the account's ID in the source system (e.g. a customer number); unique, read-only after create
   holder_name       str
   email             str, optional
   status            enum: OPEN | CLOSED
@@ -38,10 +35,10 @@ Transaction (BaseModel)
   account           FK -> Account (PROTECT)
   direction         enum: DEBIT | CREDIT
   amount            Decimal(12,2), > 0 # sign comes from direction
-  effective_date    date
+  transaction_date  date
   reference_id      str                # source-system ID, used for idempotency
   description       str, optional
-  import_batch      FK -> ImportBatch, nullable
+  import_batch      FK -> ImportBatch, nullable   # added in Milestone 5, with ImportBatch
   UNIQUE (account, reference_id)
 
 ImportBatch (BaseModel)
@@ -58,7 +55,7 @@ ImportRowError (BaseModel)
   errors            JSON               # field -> [messages]
 ```
 
-The account **balance** is computed (sum of signed amounts over the account's transactions), not stored. `Transaction.account_id` is indexed: Django indexes FK columns by default. Postgres doesn't, so check that the index appears in the migration.
+The account **balance** is computed (credits minus debits: positive is money held, negative means the account is overdrawn or owes), not stored. `Transaction.account_id` is indexed: Django indexes FK columns by default. Postgres doesn't, so check that the index appears in the migration.
 
 ### Delete rules
 
@@ -73,12 +70,12 @@ The account **balance** is computed (sum of signed amounts over the account's tr
 ### CRUD
 
 - Accounts: list (search, filter by status, paginate), create, view, edit, close.
-- Transactions: list per account and globally (filter by direction and date range), create, view.
+- Transactions: listed and posted per account (drill down from the account; filter by direction and date range), view one.
 - Account detail page: header, computed balance, transaction history.
 
 ### Bulk upload (all-or-nothing)
 
-- Upload a CSV of transactions with the columns `external_id, direction, amount, effective_date, reference_id, description`.
+- Upload a CSV of transactions with the columns `external_id, direction, amount, transaction_date, reference_id, description`.
 - Limits: 5 MB and 10,000 rows. Larger files are rejected up front with a clear error, and no batch is created.
 - The pipeline has four steps:
   1. **Parse** the file. It fails fast if the file is malformed or headers are missing.
@@ -114,8 +111,7 @@ GET                /api/health/               (200 ok; standard 500 error if the
 GET                /api/schema/               (OpenAPI schema; Redoc at /api/docs/)
 GET/POST           /api/accounts/
 GET/PATCH          /api/accounts/{id}/
-GET                /api/accounts/{id}/transactions/
-GET/POST           /api/transactions/
+GET/POST           /api/accounts/{id}/transactions/   (list or post; the account comes from the URL)
 GET                /api/transactions/{id}/
 POST               /api/imports/              (multipart: file)
 GET                /api/imports/
@@ -133,7 +129,7 @@ GET                /api/imports/sample/       (?rows=N&invalid=true)
 
 ## 4. Frontend (Vue 3)
 
-- Vite, Vue 3 Composition API with `<script setup>`, TypeScript, Vue Router, Pinia.
+- Vite, Vue 3 Composition API with `<script setup>`, TypeScript, Vue Router. No Pinia: each screen loads its own data, and nothing is shared across views. Add it only if that changes.
 - UI kit: PrimeVue, because its DataTable suits this kind of app.
 - Views: Accounts list, Account detail, Account form, Transactions list, Transaction form, Import upload (with the "Download sample file" button), Import results, Import history.
 - A typed API client: `openapi-typescript` generates TypeScript types from the drf-spectacular schema (`make api-types`), and a thin fetch wrapper uses them.
@@ -146,7 +142,7 @@ GET                /api/imports/sample/       (?rows=N&invalid=true)
 /
 ├── backend/
 │   ├── config/            # settings, urls, wsgi
-│   ├── core/              # shared: base models, error handling, API schema defaults
+│   ├── core/              # shared: BaseModel, error handling, API schema defaults
 │   ├── health/            # health check endpoint
 │   ├── ledger/            # accounts, transactions
 │   ├── imports/           # upload pipeline, sample file generator
@@ -231,8 +227,8 @@ The README is written in Milestone 1 so setup instructions exist from day one. I
 ## 8. Milestones
 
 1. **Scaffold**: Docker Compose with Postgres, Django project (uv), Vite app (Volta), Makefile, pre-commit, `.env.example`, `.gitignore`, and README (setup part). Done when a fresh clone runs `make init && make db && make migrate && make test && make lint` cleanly.
-2. **Core**: base models (timestamps, UUID primary key) with tests.
-3. **Domain + API**: models, migrations, DRF endpoints, tests.
+2. **Core** (done): abstract `BaseModel` (UUID primary key, timestamps) with tests.
+3. **Domain + API** (done): `ledger` app with Account and Transaction models, migration, services, DRF endpoints and tests. Transactions are listed and posted under their account (`/api/accounts/{id}/transactions/`); there's no all-transactions list. Posting to or editing a closed account is a 400; reposting a `reference_id` (a genuine clash) is a 409. Services lock the account row, so concurrent requests can't bypass the closed-account rule.
 4. **Frontend CRUD**: accounts and transactions screens.
 5. **Bulk upload backend**: parser, validation, bulk insert, error report, sample file generator, tests.
 6. **Bulk upload frontend**: upload, sample download, results, history.

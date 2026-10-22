@@ -4,6 +4,78 @@
  */
 
 export interface paths {
+    "/api/accounts/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List accounts
+         * @description Accounts with their current balances. Search by external ID, name or email, filter by `status`, and sort with `ordering` (for example `-balance`).
+         */
+        get: operations["accounts_list"];
+        put?: never;
+        /**
+         * Open an account
+         * @description New accounts always start OPEN, with a zero balance.
+         */
+        post: operations["accounts_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/accounts/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get an account
+         * @description One account, with its current balance.
+         */
+        get: operations["accounts_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update an account
+         * @description Change an account's name, email or status. Set `status` to CLOSED to close it: closing is final, and a closed account can't be changed (400). `external_id` can't be changed, and accounts are never deleted.
+         */
+        patch: operations["accounts_partial_update"];
+        trace?: never;
+    };
+    "/api/accounts/{id}/transactions/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List an account's transactions
+         * @description Newest first. Filter by `direction` and a `transaction_date` range.
+         */
+        get: operations["accounts_transactions_list"];
+        put?: never;
+        /**
+         * Post a transaction
+         * @description Post a transaction to the account. A closed account is a 400; a duplicate `reference_id` is a 409.
+         */
+        post: operations["accounts_transactions_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health/": {
         parameters: {
             query?: never;
@@ -24,10 +96,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/transactions/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a transaction
+         * @description Transactions can't be edited or deleted. To correct one, post a transaction for the same amount in the opposite direction.
+         */
+        get: operations["transactions_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description An account as the API returns it, and the body for creating one. */
+        Account: {
+            /** Format: uuid */
+            readonly id: string;
+            /** @description The account's ID in the source system (e.g. a customer number). Unique, and can't change after create. */
+            external_id: string;
+            holder_name: string;
+            email?: string;
+            readonly status: components["schemas"]["AccountStatusEnum"];
+            /**
+             * Format: decimal
+             * @description Credits minus debits: positive is money held, negative means the account is overdrawn.
+             */
+            readonly balance: string;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        /** @enum {string} */
+        AccountStatusEnum: "OPEN" | "CLOSED";
         Error: {
             type: components["schemas"]["ErrorTypeEnum"];
             message: string;
@@ -49,6 +162,64 @@ export interface components {
         };
         /** @enum {string} */
         HealthStatusEnum: "ok";
+        PaginatedAccountList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["Account"][];
+        };
+        PaginatedTransactionList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["Transaction"][];
+        };
+        /** @description The editable fields of an account. `external_id` can't change after create. */
+        PatchedAccountUpdate: {
+            holder_name?: string;
+            email?: string;
+            status?: components["schemas"]["AccountStatusEnum"];
+        };
+        /** @description A transaction as the API returns it, and the body for posting one (the account comes from the URL). */
+        Transaction: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly account: string;
+            direction: components["schemas"]["TransactionDirectionEnum"];
+            /**
+             * Format: decimal
+             * @description Always positive, at most 2 decimal places; the sign comes from `direction`.
+             */
+            amount: string;
+            /** Format: date */
+            transaction_date: string;
+            /** @description The source system's ID. Unique per account, so reposting is idempotent. */
+            reference_id: string;
+            description?: string;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        /** @enum {string} */
+        TransactionDirectionEnum: "DEBIT" | "CREDIT";
     };
     responses: never;
     parameters: never;
@@ -58,6 +229,292 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    accounts_list: {
+        parameters: {
+            query?: {
+                /** @description Which field to use when ordering the results. */
+                ordering?: string;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description A search term. */
+                search?: string;
+                status?: "CLOSED" | "OPEN";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedAccountList"];
+                };
+            };
+            /** @description Unexpected server error. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    accounts_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Account"];
+                "application/x-www-form-urlencoded": components["schemas"]["Account"];
+                "multipart/form-data": components["schemas"]["Account"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Account"];
+                };
+            };
+            /** @description The request data is invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unexpected server error. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    accounts_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A UUID string identifying this account. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Account"];
+                };
+            };
+            /** @description No object with this id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unexpected server error. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    accounts_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A UUID string identifying this account. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedAccountUpdate"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedAccountUpdate"];
+                "multipart/form-data": components["schemas"]["PatchedAccountUpdate"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Account"];
+                };
+            };
+            /** @description The request data is invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description No object with this id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unexpected server error. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    accounts_transactions_list: {
+        parameters: {
+            query?: {
+                direction?: "CREDIT" | "DEBIT";
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Use `transaction_date_after` and/or `transaction_date_before` (inclusive). */
+                transaction_date_after?: string;
+                /** @description Use `transaction_date_after` and/or `transaction_date_before` (inclusive). */
+                transaction_date_before?: string;
+            };
+            header?: never;
+            path: {
+                /** @description A UUID string identifying this transaction. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedTransactionList"];
+                };
+            };
+            /** @description No object with this id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unexpected server error. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    accounts_transactions_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A UUID string identifying this transaction. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Transaction"];
+                "application/x-www-form-urlencoded": components["schemas"]["Transaction"];
+                "multipart/form-data": components["schemas"]["Transaction"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Transaction"];
+                };
+            };
+            /** @description The request data is invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description No object with this id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The account already has a transaction with this `reference_id`. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unexpected server error. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     health_retrieve: {
         parameters: {
             query?: never;
@@ -74,6 +531,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Health"];
+                };
+            };
+            /** @description Unexpected server error. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    transactions_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A UUID string identifying this transaction. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Transaction"];
+                };
+            };
+            /** @description No object with this id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Unexpected server error. */

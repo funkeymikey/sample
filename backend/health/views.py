@@ -4,7 +4,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from health.services import HealthStatus, do_health_check
+from health.services import HealthStatus
 
 HealthSerializer = inline_serializer("Health", {"status": serializers.ChoiceField(choices=HealthStatus.choices)})
 
@@ -14,6 +14,7 @@ class HealthView(APIView):
 
     @extend_schema(
         summary="Health check",
+        tags=["Health"],
         description=(
             "Runs a trivial query against the database. Intended for uptime checks and load balancers: "
             "anything other than a 200 means the API can't serve requests. If the database is unreachable, "
@@ -29,4 +30,6 @@ class HealthView(APIView):
     )
     def get(self, request: Request) -> Response:
         """Return 200 `{"status": "ok"}`; a database failure becomes the exception handler's 500."""
+        from health.services import do_health_check
+
         return Response(do_health_check())

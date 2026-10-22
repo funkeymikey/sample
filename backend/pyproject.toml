@@ -38,7 +38,7 @@ python_files = ["test_*.py"]
 
 [tool.coverage.run]
 source = ["."]
-omit = [".venv/*", "*/migrations/*", "*/tests/*", "manage.py", "config/wsgi.py"]
+omit = [".venv/*", "*/migrations/*", "*/tests/*", "conftest.py", "manage.py", "config/wsgi.py"]
 
 [tool.coverage.report]
 skip_empty = true

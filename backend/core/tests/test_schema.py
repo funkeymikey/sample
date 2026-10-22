@@ -1,8 +1,6 @@
 from typing import Any
 
 import pytest
-from django.urls import path
-from drf_spectacular.generators import SchemaGenerator
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import serializers
 from rest_framework.request import Request
@@ -43,11 +41,15 @@ class ItemCloseView(APIView):
 
 
 def build_schema(urlpatterns: list[Any]) -> dict[str, Any]:
+    from drf_spectacular.generators import SchemaGenerator
+
     return SchemaGenerator(patterns=urlpatterns).get_schema(request=None, public=True)
 
 
 @pytest.fixture(scope="module")
 def item_schema() -> dict[str, Any]:
+    from django.urls import path
+
     return build_schema(
         [
             path("items/", ItemListView.as_view()),
@@ -101,3 +103,12 @@ def test_health_documents_ok_and_500() -> None:
     schema = build_schema(project_urlpatterns)
 
     assert response_codes(schema, "/api/health/", "get") == {"200", "500"}
+
+
+def test_every_endpoint_has_a_summary_and_a_capitalized_tag() -> None:
+    schema = build_schema(project_urlpatterns)
+
+    for path_name, operations in schema["paths"].items():
+        for method, operation in operations.items():
+            assert operation.get("summary"), f"{method.upper()} {path_name} needs a summary"
+            assert [tag[0].isupper() for tag in operation["tags"]] == [True], f"{method.upper()} {path_name}: tags"

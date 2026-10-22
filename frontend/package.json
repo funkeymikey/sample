@@ -14,7 +14,6 @@
     "api-types": "npx --yes openapi-typescript@7.13.0 ../backend/openapi.yml -o src/api/schema.d.ts"
   },
   "dependencies": {
-    "pinia": "^4.0.3",
     "vue": "^3.5.42",
     "vue-router": "^5.3.1"
   },

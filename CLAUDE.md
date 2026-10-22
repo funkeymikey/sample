@@ -34,7 +34,7 @@ Requests flow view → service → serializer:
 - Never use `any`; use `unknown` plus a type guard for data of unknown shape (e.g. parsed JSON)
 - Use string-literal union types (including the generated enum unions) instead of TypeScript `enum`, and never compare against a bare string when a union type exists
 - Type component props and emits with `defineProps<{...}>()` / `defineEmits<{...}>()`
-- Keep state local to a component; use a Pinia store only for state shared across views
+- Keep state local to a component and load data per view (by id from the route); there's no global store (Pinia isn't installed — add it only for state that's genuinely shared across views)
 - Use `async`/`await`, not `.then()` chains; catch `ApiError` and use its `errorResponse` to show the API's message
 - Import app code through the `@/` alias, not relative `../../` paths; group imports as packages, then a blank line, then `@/` imports
 - Use descriptive names, same as Python: `accountBalance`, not `bal`; components in PascalCase (`AccountList.vue`), composables as `useX`

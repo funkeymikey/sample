@@ -25,6 +25,8 @@ SPECTACULAR_SETTINGS = {
     "ENUM_NAME_OVERRIDES": {
         "HealthStatusEnum": "health.services.HealthStatus",
         "ErrorTypeEnum": "core.exceptions.ErrorType",
+        "AccountStatusEnum": "ledger.models.AccountStatus",
+        "TransactionDirectionEnum": "ledger.models.TransactionDirection",
     },
     # Enums list exactly the values callers may send; a field's nullability is expressed by the field.
     "ENUM_ADD_EXPLICIT_BLANK_NULL_CHOICE": False,

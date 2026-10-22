@@ -18,11 +18,7 @@ from http import HTTPStatus
 from typing import Any
 
 from django.db import models
-from django.http import Http404
-from rest_framework import exceptions
 from rest_framework.response import Response
-from rest_framework.settings import api_settings
-from rest_framework.views import set_rollback
 
 LOGGER = logging.getLogger(__name__)
 
@@ -77,6 +73,11 @@ def api_exception_handler(exception: Exception, context: dict[str, Any]) -> Resp
     `ApiError`s and DRF exceptions keep their 4xx status and message. Anything else is a 500 with
     a generic message; its details go only to the log, never to the client.
     """
+    from django.http import Http404
+    from rest_framework import exceptions
+    from rest_framework.settings import api_settings
+    from rest_framework.views import set_rollback
+
     # DRF's generic views raise Django's Http404 for unknown ids.
     if isinstance(exception, Http404):
         exception = exceptions.NotFound(str(exception) or None)

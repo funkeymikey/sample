@@ -135,5 +135,5 @@ lint:
 # Export the OpenAPI schema and regenerate the frontend's TypeScript types.
 .PHONY: api-types
 api-types:
-	$(MANAGE) spectacular --validate --file openapi.yml
+	$(MANAGE) spectacular --validate --fail-on-warn --file openapi.yml
 	$(NPM) run api-types

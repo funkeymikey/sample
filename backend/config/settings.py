@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "core",
     "health",
+    "ledger",
 ]
 
 MIDDLEWARE = [

@@ -1,23 +1,26 @@
-import logging
-from unittest import mock
-
 import pytest
-from django.db import OperationalError
 from django.urls import reverse
 from rest_framework.test import APIClient
 
 
 @pytest.mark.django_db
-def test_health_reports_ok() -> None:
-    response = APIClient().get(reverse("health"))
+def test_health_reports_ok(api_client: APIClient) -> None:
+    response = api_client.get(reverse("health"))
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
 
-def test_health_returns_logged_500_when_database_is_down(caplog: pytest.LogCaptureFixture) -> None:
-    with mock.patch("health.services.connection.cursor", side_effect=OperationalError("connection refused")):
-        response = APIClient().get(reverse("health"))
+def test_health_returns_logged_500_when_database_is_down(
+    api_client: APIClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    import logging
+    from unittest import mock
+
+    from django.db import OperationalError
+
+    with mock.patch("django.db.connection.cursor", side_effect=OperationalError("connection refused")):
+        response = api_client.get(reverse("health"))
 
     assert response.status_code == 500
     assert response.json()["error"]["type"] == "INTERNAL_ERROR"
@@ -25,8 +28,6 @@ def test_health_returns_logged_500_when_database_is_down(caplog: pytest.LogCaptu
     assert [record.levelno for record in caplog.records if record.name == "core.exceptions"] == [logging.ERROR]
 
 
-def test_api_docs_render() -> None:
-    client = APIClient()
-
-    assert client.get(reverse("redoc")).status_code == 200
-    assert client.get(reverse("schema")).status_code == 200
+def test_api_docs_render(api_client: APIClient) -> None:
+    assert api_client.get(reverse("redoc")).status_code == 200
+    assert api_client.get(reverse("schema")).status_code == 200
