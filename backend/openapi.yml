@@ -1,0 +1,87 @@
+openapi: 3.0.3
+info:
+  title: Ledger API
+  version: 0.1.0
+  description: Accounts, transactions and bulk CSV imports.
+paths:
+  /api/health/:
+    get:
+      operationId: health_retrieve
+      description: 'Runs a trivial query against the database. Intended for uptime
+        checks and load balancers: anything other than a 200 means the API can''t
+        serve requests. If the database is unreachable, the response is the standard
+        500 error.'
+      summary: Health check
+      tags:
+      - health
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+              examples:
+                Healthy:
+                  value:
+                    status: ok
+          description: The API is up and the database is reachable.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected server error.
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        type:
+          $ref: '#/components/schemas/ErrorTypeEnum'
+        message:
+          type: string
+        detail:
+          type: string
+          description: Extra context, when there is any.
+        fields:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: 'Validation errors only: messages for each invalid field (`non_field_errors`
+            for the rest).'
+      required:
+      - message
+      - type
+    ErrorResponse:
+      type: object
+      description: The body of every error response (see `core.exceptions.api_exception_handler`).
+      properties:
+        error:
+          $ref: '#/components/schemas/Error'
+      required:
+      - error
+    ErrorTypeEnum:
+      enum:
+      - VALIDATION_ERROR
+      - NOT_FOUND
+      - METHOD_NOT_ALLOWED
+      - CONFLICT
+      - UNSUPPORTED_MEDIA_TYPE
+      - REQUEST_ERROR
+      - INTERNAL_ERROR
+      type: string
+    Health:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/HealthStatusEnum'
+      required:
+      - status
+    HealthStatusEnum:
+      enum:
+      - ok
+      type: string

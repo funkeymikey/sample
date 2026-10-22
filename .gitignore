@@ -1,0 +1,33 @@
+# Environment
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Node / Vite
+node_modules/
+dist/
+dist-ssr/
+coverage/
+*.tsbuildinfo
+.eslintcache
+*.local
+*.timestamp-*-*.mjs
+__screenshots__/
+
+# Logs
+*.log
+
+# Editors / OS
+.DS_Store
+.idea/
+
+# Claude Code: share project settings, not personal ones
+.claude/settings.local.json

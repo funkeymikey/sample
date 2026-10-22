@@ -1,0 +1,48 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-executables-have-shebangs
+      - id: check-json
+        # tsconfig files are JSONC (comments allowed)
+        exclude: ^frontend/tsconfig.*\.json
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+      - id: debug-statements
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: trailing-whitespace
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.1
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+        files: ^backend/
+      - id: ruff-format
+        files: ^backend/
+
+  # Frontend hooks use the project's own ESLint and Prettier (installed by
+  # `make install`). They cd into frontend/ so Volta picks the pinned Node and
+  # the tools find their configs; file paths are rewritten to match.
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint
+        entry: bash -c 'cd frontend && npx eslint --fix "${@#frontend/}"' --
+        language: system
+        files: ^frontend/.*\.(vue|ts|mts|tsx)$
+      - id: prettier
+        name: prettier
+        entry: bash -c 'cd frontend && npx prettier --write --ignore-unknown "${@#frontend/}"' --
+        language: system
+        files: ^frontend/src/
+      - id: vue-tsc
+        name: vue-tsc (type check)
+        # Checks the whole project, since a change in one file can break types in another.
+        entry: bash -c 'cd frontend && npx vue-tsc --build'
+        language: system
+        files: ^frontend/(.*\.(vue|ts|mts|tsx)|tsconfig.*\.json)$
+        pass_filenames: false
