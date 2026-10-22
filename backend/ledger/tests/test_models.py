@@ -23,11 +23,11 @@ def test_base_model_gives_uuid_primary_key_and_timestamps() -> None:
     assert account.updated_at > first_updated_at
 
 
-def test_external_id_is_unique() -> None:
-    AccountFactory(external_id="ACCT000001")
+def test_account_number_is_unique() -> None:
+    AccountFactory(account_number="ACCT000001")
 
     with pytest.raises(IntegrityError):
-        AccountFactory(external_id="ACCT000001")
+        AccountFactory(account_number="ACCT000001")
 
 
 def test_reference_id_is_unique_per_account_only() -> None:
@@ -131,7 +131,7 @@ def test_balances_are_computed_per_account_in_one_query(django_assert_num_querie
 
 def test_string_representations() -> None:
     transaction = TransactionFactory(
-        account=AccountFactory(external_id="ACCT1", holder_name="Ada Lovelace"),
+        account=AccountFactory(account_number="ACCT1", holder_name="Ada Lovelace"),
         reference_id="REF-1",
         direction=TransactionDirection.CREDIT,
         amount=Decimal("12.50"),

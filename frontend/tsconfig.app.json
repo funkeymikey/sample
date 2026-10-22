@@ -1,8 +1,11 @@
 {
   "extends": "@vue/tsconfig/tsconfig.dom.json",
   "include": ["env.d.ts", "src/**/*", "src/**/*.vue"],
-  "exclude": ["src/**/*.spec.ts"],
+  "exclude": ["src/**/*.spec.ts", "src/testing.ts", "src/test-setup.ts"],
   "compilerOptions": {
+    // ES2023.Intl adds the types for formatting decimal strings exactly (see formatMoney in src/format.ts).
+    "lib": ["ES2022", "ES2023.Intl", "DOM", "DOM.Iterable"],
+
     // Extra safety for array and object lookups, but may have false positives.
     "noUncheckedIndexedAccess": true,
 

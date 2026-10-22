@@ -31,10 +31,18 @@ def test_transactions_are_only_listed_per_account(schema: dict[str, Any]) -> Non
     }
 
 
-def test_account_is_not_part_of_the_create_body(schema: dict[str, Any]) -> None:
-    transaction = schema["components"]["schemas"]["Transaction"]
+def test_request_bodies_only_contain_writable_fields(schema: dict[str, Any]) -> None:
+    components = schema["components"]["schemas"]
 
-    assert transaction["properties"]["account"]["readOnly"] is True
+    assert set(components["TransactionRequest"]["properties"]) == {
+        "direction",
+        "amount",
+        "transaction_date",
+        "reference_id",
+        "description",
+    }
+    assert set(components["AccountRequest"]["properties"]) == {"account_number", "holder_name", "email"}
+    assert set(components["PatchedAccountUpdateRequest"]["properties"]) == {"holder_name", "email", "status"}
 
 
 def test_transaction_endpoints_are_grouped_together(schema: dict[str, Any]) -> None:

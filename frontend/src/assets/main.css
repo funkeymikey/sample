@@ -1,0 +1,333 @@
+:root {
+  --app-max-width: 64rem;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 15px;
+}
+
+body {
+  margin: 0;
+  font-family:
+    'Inter Variable',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  font-feature-settings: 'cv11', 'ss01';
+  background: var(--p-surface-0);
+  color: var(--p-text-color);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+a.p-button,
+a.p-button:hover {
+  text-decoration: none;
+}
+
+h1,
+h2 {
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+
+.muted {
+  color: var(--p-text-muted-color);
+}
+
+/* --- Page layout --------------------------------------------------------- */
+
+.page {
+  max-width: var(--app-max-width);
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem 4rem;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.85rem;
+  color: var(--p-text-muted-color);
+}
+
+.back-link:hover {
+  color: var(--p-text-color);
+  text-decoration: none;
+}
+
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.page-header h1 {
+  font-size: 2rem;
+  line-height: 1.15;
+}
+
+.subtitle {
+  margin: 0.4rem 0 0;
+  color: var(--p-text-muted-color);
+}
+
+.section {
+  margin-top: 3rem;
+}
+
+.section-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.section-header h2 {
+  font-size: 1.1rem;
+}
+
+.eyebrow {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--p-text-muted-color);
+}
+
+/* --- Toolbars and filters ------------------------------------------------ */
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.search-field {
+  width: 24rem;
+  max-width: 100%;
+}
+
+.search-field .p-inputtext {
+  width: 100%;
+  background: var(--p-surface-50);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.search-field .p-inputtext:focus {
+  background: var(--p-surface-0);
+  border-color: var(--p-surface-300);
+}
+
+.date-filter {
+  width: 9.5rem;
+}
+
+/* --- Tables: no frame, just rows ---------------------------------------- */
+
+.minimal-table .p-datatable-table-container {
+  border-top: 1px solid var(--p-surface-200);
+}
+
+.minimal-table .p-datatable-thead > tr > th {
+  background: transparent;
+  padding: 0.6rem 0.75rem;
+  border-color: var(--p-surface-200);
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--p-text-muted-color);
+}
+
+.minimal-table .p-datatable-thead > tr > th.p-datatable-column-sorted {
+  background: transparent;
+  color: var(--p-text-color);
+}
+
+.minimal-table .p-datatable-tbody > tr > td {
+  padding: 0.85rem 0.75rem;
+  border-color: var(--p-surface-100);
+}
+
+.minimal-table .p-datatable-tbody > tr {
+  cursor: pointer;
+  transition: background-color 0.1s;
+}
+
+.minimal-table .p-datatable-tbody > tr:hover {
+  background: var(--p-surface-50);
+}
+
+.minimal-table .p-datatable-paginator-bottom {
+  border: none;
+}
+
+.minimal-table .p-datatable-empty-message td {
+  padding: 3rem 0.75rem;
+  text-align: center;
+  cursor: default;
+}
+
+.align-right {
+  text-align: right !important;
+}
+
+.align-right .p-datatable-column-header-content {
+  justify-content: flex-end;
+}
+
+.person {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.person-name {
+  font-weight: 500;
+}
+
+/* --- Forms --------------------------------------------------------------- */
+
+.form {
+  display: grid;
+  gap: 1.5rem;
+  max-width: 32rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.field label {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.field .hint {
+  color: var(--p-text-muted-color);
+  font-size: 0.8rem;
+}
+
+.field-error {
+  color: var(--p-red-600);
+  font-size: 0.8rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+}
+
+/* --- Detail lists -------------------------------------------------------- */
+
+.details {
+  display: grid;
+  grid-template-columns: 10rem 1fr;
+  margin: 0;
+}
+
+.details dt,
+.details dd {
+  margin: 0;
+  padding: 0.85rem 0;
+  /* A fixed line height keeps label and value text level, even when the value is a smaller monospace font. */
+  line-height: 1.5rem;
+  border-bottom: 1px solid var(--p-surface-100);
+}
+
+.details dt {
+  color: var(--p-text-muted-color);
+}
+
+/* --- Small screens ------------------------------------------------------- */
+
+@media (max-width: 640px) {
+  .page {
+    padding-top: 1.75rem;
+  }
+
+  .page-header h1 {
+    font-size: 1.6rem;
+  }
+
+  .hide-on-mobile {
+    display: none;
+  }
+
+  .search-field {
+    width: 100%;
+  }
+
+  .filters {
+    width: 100%;
+  }
+
+  /* The direction filter gets its own row, so the two dates can share the next one. */
+  .filters > .p-selectbutton {
+    flex-basis: 100%;
+  }
+
+  .date-filter {
+    flex: 1;
+    width: auto;
+  }
+
+  .minimal-table .p-datatable-thead > tr > th,
+  .minimal-table .p-datatable-tbody > tr > td {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  .details {
+    grid-template-columns: 7rem 1fr;
+  }
+}

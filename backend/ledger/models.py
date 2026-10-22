@@ -45,11 +45,10 @@ class AccountQuerySet(models.QuerySet):
 
 
 class Account(BaseModel):
-    external_id = models.CharField(
+    account_number = models.CharField(
         max_length=32,
         unique=True,
-        help_text="The account's ID in the source system (e.g. a customer number). "
-        "Unique, and can't change after create.",
+        help_text="Unique, and can't change after create. Generated (10 random digits) when left blank.",
     )
     holder_name = models.CharField(max_length=200)
     email = models.EmailField(blank=True)
@@ -58,10 +57,10 @@ class Account(BaseModel):
     objects = AccountQuerySet.as_manager()
 
     class Meta:
-        ordering = ["external_id"]
+        ordering = ["account_number"]
 
     def __str__(self) -> str:
-        return f"{self.external_id} ({self.holder_name})"
+        return f"{self.account_number} ({self.holder_name})"
 
 
 class Transaction(BaseModel):
@@ -72,7 +71,9 @@ class Transaction(BaseModel):
     )
     transaction_date = models.DateField()
     reference_id = models.CharField(
-        max_length=64, help_text="The source system's ID. Unique per account, so reposting is idempotent."
+        max_length=64,
+        help_text="The source system's ID, unique per account, so reposting is idempotent. "
+        'Generated ("TXN-" and 8 letters or digits) when left blank.',
     )
     description = models.CharField(max_length=255, blank=True)
 

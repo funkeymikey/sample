@@ -68,7 +68,6 @@ def test_account_in_the_body_is_ignored(api_client: APIClient) -> None:
         ({"amount": "10.005"}, "amount"),  # more than 2 decimal places: rejected, never rounded
         ({"direction": "SIDEWAYS"}, "direction"),
         ({"transaction_date": "2026-02-30"}, "transaction_date"),
-        ({"reference_id": ""}, "reference_id"),
         ({"amount": "12345678901.00"}, "amount"),  # 13 digits: more than the column holds
     ],
 )
@@ -83,6 +82,23 @@ def test_create_transaction_validates_input(
     assert response.status_code == 400
     assert list(response.json()["error"]["fields"]) == [invalid_field]
     assert Transaction.objects.count() == 0
+
+
+@pytest.mark.parametrize("reference", [{}, {"reference_id": ""}], ids=["left out", "blank"])
+def test_create_transaction_generates_a_reference_when_none_is_given(
+    api_client: APIClient, reference: dict[str, str]
+) -> None:
+    import re
+
+    payload = {**transaction_payload(), **reference}
+    if not reference:
+        del payload["reference_id"]
+    account = AccountFactory()
+
+    response = api_client.post(transactions_url(account.pk), payload, format="json")
+
+    assert response.status_code == 201
+    assert re.fullmatch(r"TXN-[A-Z0-9]{8}", response.json()["reference_id"])
 
 
 def test_posting_to_an_unknown_account_is_a_404(api_client: APIClient) -> None:
@@ -186,7 +202,11 @@ def test_create_transaction_requires_fields(api_client: APIClient) -> None:
     response = api_client.post(transactions_url(account.pk), {}, format="json")
 
     assert response.status_code == 400
-    assert set(response.json()["error"]["fields"]) == {"direction", "amount", "transaction_date", "reference_id"}
+    assert set(response.json()["error"]["fields"]) == {
+        "direction",
+        "amount",
+        "transaction_date",
+    }  # reference is optional
 
 
 def test_description_is_optional(api_client: APIClient) -> None:

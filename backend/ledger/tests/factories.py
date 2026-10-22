@@ -10,7 +10,7 @@ class AccountFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Account
 
-    external_id = factory.Sequence(lambda number: f"ACCT{number:06d}")
+    account_number = factory.Sequence(lambda number: f"ACCT{number:06d}")
     holder_name = factory.Faker("name")
     email = factory.Faker("email")
     status = AccountStatus.OPEN

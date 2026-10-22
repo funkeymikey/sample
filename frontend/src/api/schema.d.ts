@@ -13,13 +13,13 @@ export interface paths {
         };
         /**
          * List accounts
-         * @description Accounts with their current balances. Search by external ID, name or email, filter by `status`, and sort with `ordering` (for example `-balance`).
+         * @description Accounts with their current balances. Search by account number, name or email, filter by `status`, and sort with `ordering` (for example `-balance`).
          */
         get: operations["accounts_list"];
         put?: never;
         /**
          * Open an account
-         * @description New accounts always start OPEN, with a zero balance.
+         * @description New accounts always start OPEN, with a zero balance. Leave out `account_number` to have one generated.
          */
         post: operations["accounts_create"];
         delete?: never;
@@ -47,7 +47,7 @@ export interface paths {
         head?: never;
         /**
          * Update an account
-         * @description Change an account's name, email or status. Set `status` to CLOSED to close it: closing is final, and a closed account can't be changed (400). `external_id` can't be changed, and accounts are never deleted.
+         * @description Change an account's name, email or status. Set `status` to CLOSED to close it: closing is final, and a closed account can't be changed (400). `account_number` can't be changed, and accounts are never deleted.
          */
         patch: operations["accounts_partial_update"];
         trace?: never;
@@ -67,7 +67,7 @@ export interface paths {
         put?: never;
         /**
          * Post a transaction
-         * @description Post a transaction to the account. A closed account is a 400; a duplicate `reference_id` is a 409.
+         * @description Post a transaction to the account. Leave out `reference_id` to have one generated. A closed account is a 400; a duplicate `reference_id` is a 409.
          */
         post: operations["accounts_transactions_create"];
         delete?: never;
@@ -124,8 +124,8 @@ export interface components {
         Account: {
             /** Format: uuid */
             readonly id: string;
-            /** @description The account's ID in the source system (e.g. a customer number). Unique, and can't change after create. */
-            external_id: string;
+            /** @description Unique, and can't change after create. Generated (10 random digits) when left blank. */
+            account_number?: string;
             holder_name: string;
             email?: string;
             readonly status: components["schemas"]["AccountStatusEnum"];
@@ -138,6 +138,13 @@ export interface components {
             readonly created_at: string;
             /** Format: date-time */
             readonly updated_at: string;
+        };
+        /** @description An account as the API returns it, and the body for creating one. */
+        AccountRequest: {
+            /** @description Unique, and can't change after create. Generated (10 random digits) when left blank. */
+            account_number?: string;
+            holder_name: string;
+            email?: string;
         };
         /** @enum {string} */
         AccountStatusEnum: "OPEN" | "CLOSED";
@@ -192,8 +199,8 @@ export interface components {
             previous?: string | null;
             results: components["schemas"]["Transaction"][];
         };
-        /** @description The editable fields of an account. `external_id` can't change after create. */
-        PatchedAccountUpdate: {
+        /** @description The editable fields of an account. `account_number` can't change after create. */
+        PatchedAccountUpdateRequest: {
             holder_name?: string;
             email?: string;
             status?: components["schemas"]["AccountStatusEnum"];
@@ -212,14 +219,28 @@ export interface components {
             amount: string;
             /** Format: date */
             transaction_date: string;
-            /** @description The source system's ID. Unique per account, so reposting is idempotent. */
-            reference_id: string;
+            /** @description The source system's ID, unique per account, so reposting is idempotent. Generated ("TXN-" and 8 letters or digits) when left blank. */
+            reference_id?: string;
             description?: string;
             /** Format: date-time */
             readonly created_at: string;
         };
         /** @enum {string} */
         TransactionDirectionEnum: "DEBIT" | "CREDIT";
+        /** @description A transaction as the API returns it, and the body for posting one (the account comes from the URL). */
+        TransactionRequest: {
+            direction: components["schemas"]["TransactionDirectionEnum"];
+            /**
+             * Format: decimal
+             * @description Always positive, at most 2 decimal places; the sign comes from `direction`.
+             */
+            amount: string;
+            /** Format: date */
+            transaction_date: string;
+            /** @description The source system's ID, unique per account, so reposting is idempotent. Generated ("TXN-" and 8 letters or digits) when left blank. */
+            reference_id?: string;
+            description?: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -274,9 +295,9 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Account"];
-                "application/x-www-form-urlencoded": components["schemas"]["Account"];
-                "multipart/form-data": components["schemas"]["Account"];
+                "application/json": components["schemas"]["AccountRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["AccountRequest"];
+                "multipart/form-data": components["schemas"]["AccountRequest"];
             };
         };
         responses: {
@@ -360,9 +381,9 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/json": components["schemas"]["PatchedAccountUpdate"];
-                "application/x-www-form-urlencoded": components["schemas"]["PatchedAccountUpdate"];
-                "multipart/form-data": components["schemas"]["PatchedAccountUpdate"];
+                "application/json": components["schemas"]["PatchedAccountUpdateRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedAccountUpdateRequest"];
+                "multipart/form-data": components["schemas"]["PatchedAccountUpdateRequest"];
             };
         };
         responses: {
@@ -463,9 +484,9 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Transaction"];
-                "application/x-www-form-urlencoded": components["schemas"]["Transaction"];
-                "multipart/form-data": components["schemas"]["Transaction"];
+                "application/json": components["schemas"]["TransactionRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["TransactionRequest"];
+                "multipart/form-data": components["schemas"]["TransactionRequest"];
             };
         };
         responses: {

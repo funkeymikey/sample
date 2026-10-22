@@ -27,7 +27,7 @@ Deleting is not supported. The ledger is immutable and accounts are closed rathe
 
 ```
 Account (BaseModel)
-  external_id       str                # the account's ID in the source system (e.g. a customer number); unique, read-only after create
+  account_number    str                # unique, read-only after create; generated (10 random digits) when left blank
   holder_name       str
   email             str, optional
   status            enum: OPEN | CLOSED
@@ -36,7 +36,7 @@ Transaction (BaseModel)
   direction         enum: DEBIT | CREDIT
   amount            Decimal(12,2), > 0 # sign comes from direction
   transaction_date  date
-  reference_id      str                # source-system ID, used for idempotency
+  reference_id      str                # source-system ID, used for idempotency; generated ("TXN-" + 8 chars) when left blank
   description       str, optional
   import_batch      FK -> ImportBatch, nullable   # added in Milestone 5, with ImportBatch
   UNIQUE (account, reference_id)
@@ -59,7 +59,7 @@ The account **balance** is computed (credits minus debits: positive is money hel
 
 ### Delete rules
 
-- **Account:** the API offers no delete. An account can be edited (except `external_id`), and it's retired by setting its status to CLOSED. An account can be closed with a nonzero balance. CLOSED is final: the API rejects setting the status back to OPEN, and a closed account can't be edited or receive new transactions.
+- **Account:** the API offers no delete. An account can be edited (except `account_number`), and it's retired by setting its status to CLOSED. An account can be closed with a nonzero balance. CLOSED is final: the API rejects setting the status back to OPEN, and a closed account can't be edited or receive new transactions.
 - **Transaction:** the API offers no delete or edit. You correct a transaction by posting one with the same amount in the opposite direction, as real ledgers do.
 - **ImportBatch:** an import is never deleted. Its transactions are the audit trail.
 
@@ -75,7 +75,7 @@ The account **balance** is computed (credits minus debits: positive is money hel
 
 ### Bulk upload (all-or-nothing)
 
-- Upload a CSV of transactions with the columns `external_id, direction, amount, transaction_date, reference_id, description`.
+- Upload a CSV of transactions with the columns `account_number, direction, amount, transaction_date, reference_id, description`. Unlike the form, imports require `reference_id`: re-importing the same file must not post anything twice.
 - Limits: 5 MB and 10,000 rows. Larger files are rejected up front with a clear error, and no batch is created.
 - The pipeline has four steps:
   1. **Parse** the file. It fails fast if the file is malformed or headers are missing.
@@ -89,7 +89,7 @@ The account **balance** is computed (credits minus debits: positive is money hel
 ### Download sample file
 
 - An **"Download sample file"** button on the upload page.
-- The file is generated on the fly by `GET /api/imports/sample/?rows=25`. It uses real account `external_id`s from the DB, a mix of debits and credits, plus fresh unique `reference_id`s. That way the file passes validation and uploads successfully as-is, which makes the demo work end to end.
+- The file is generated on the fly by `GET /api/imports/sample/?rows=25`. It uses real account numbers from the DB, a mix of debits and credits, plus fresh unique `reference_id`s. That way the file passes validation and uploads successfully as-is, which makes the demo work end to end.
 - `?invalid=true` produces a file with a few deliberate errors (an unknown account, a negative amount, a bad date, a duplicate reference), to demo the failure path.
 - If there are no accounts in the DB, the endpoint returns a clear error telling the user to create accounts or run `seed_demo`.
 - Static copies of both files are also committed in `samples/` for the README and tests.
@@ -130,8 +130,9 @@ GET                /api/imports/sample/       (?rows=N&invalid=true)
 ## 4. Frontend (Vue 3)
 
 - Vite, Vue 3 Composition API with `<script setup>`, TypeScript, Vue Router. No Pinia: each screen loads its own data, and nothing is shared across views. Add it only if that changes.
-- UI kit: PrimeVue, because its DataTable suits this kind of app.
-- Views: Accounts list, Account detail, Account form, Transactions list, Transaction form, Import upload (with the "Download sample file" button), Import results, Import history.
+- UI kit: PrimeVue 4 (Aura theme), because its DataTable suits this kind of app.
+- Views: Accounts list, Account detail (with the account's transactions), Account form (open and edit), Transaction form, Transaction detail, Import upload (with the "Download sample file" button), Import results, Import history.
+- Money is never a JavaScript number: amounts stay decimal strings from the API to the screen (`Intl.NumberFormat` formats the string exactly), and typed amounts become 2-decimal strings before they're sent.
 - A typed API client: `openapi-typescript` generates TypeScript types from the drf-spectacular schema (`make api-types`), and a thin fetch wrapper uses them.
 
 ---
@@ -213,7 +214,7 @@ The README is written in Milestone 1 so setup instructions exist from day one. I
 ## 7. Quality bar
 
 - **Backend tests:** pytest-django + factory_boy. Cover:
-  - Unique constraints on `external_id` and `(account, reference_id)`.
+  - Unique constraints on `account_number` and `(account, reference_id)`.
   - Serializers and API endpoints.
   - The import pipeline: happy path, every validation failure, duplicates within the file and in the DB, and a check that nothing is inserted on failure.
   - The sample file generator, including a test that its output imports cleanly.
@@ -229,7 +230,7 @@ The README is written in Milestone 1 so setup instructions exist from day one. I
 1. **Scaffold**: Docker Compose with Postgres, Django project (uv), Vite app (Volta), Makefile, pre-commit, `.env.example`, `.gitignore`, and README (setup part). Done when a fresh clone runs `make init && make db && make migrate && make test && make lint` cleanly.
 2. **Core** (done): abstract `BaseModel` (UUID primary key, timestamps) with tests.
 3. **Domain + API** (done): `ledger` app with Account and Transaction models, migration, services, DRF endpoints and tests. Transactions are listed and posted under their account (`/api/accounts/{id}/transactions/`); there's no all-transactions list. Posting to or editing a closed account is a 400; reposting a `reference_id` (a genuine clash) is a 409. Services lock the account row, so concurrent requests can't bypass the closed-account rule.
-4. **Frontend CRUD**: accounts and transactions screens.
+4. **Frontend CRUD** (done): accounts list (server-side paging, search, status filter, sorting), account detail with its transactions (direction and date filters) and close-with-confirmation, account form (open and edit), transaction form, transaction detail. API field errors show next to their fields; tests sit beside each view. Search, filters, sort and page live in the URL (e.g. `/accounts?status=CLOSED&ordering=-balance&page=2`, `/accounts/{id}?direction=DEBIT&from=2026-09-01`), so refresh, shared links and Back restore them; invalid values are ignored, and a page that no longer exists falls back to page 1.
 5. **Bulk upload backend**: parser, validation, bulk insert, error report, sample file generator, tests.
 6. **Bulk upload frontend**: upload, sample download, results, history.
 7. **Polish**: seed command, static sample files, README, screenshots.

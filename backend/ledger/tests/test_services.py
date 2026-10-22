@@ -1,9 +1,11 @@
+from unittest import mock
+
 import pytest
 
 from core.exceptions import ApiError
 from ledger.models import Account, AccountStatus, Transaction
-from ledger.services import update_account
-from ledger.tests.factories import AccountFactory
+from ledger.services import create_account, update_account
+from ledger.tests.factories import AccountFactory, TransactionFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -26,9 +28,8 @@ def post(account: Account, reference_id: str = "REF-1") -> Transaction:
 
 
 def test_create_account_starts_open() -> None:
-    from ledger.services import create_account
 
-    account = create_account(external_id="ACCT1", holder_name="Ada Lovelace", email="ada@example.com")
+    account = create_account(account_number="ACCT1", holder_name="Ada Lovelace", email="ada@example.com")
 
     assert account.status == AccountStatus.OPEN
 
@@ -73,10 +74,59 @@ def test_closed_account_cannot_receive_transactions() -> None:
 
 def test_duplicate_reference_is_a_conflict() -> None:
     from core.exceptions import ConflictError
-    from ledger.tests.factories import TransactionFactory
 
     existing = TransactionFactory(reference_id="REF-1")
 
     with pytest.raises(ConflictError, match="REF-1"):
         post(existing.account, reference_id="REF-1")
     assert Transaction.objects.count() == 1
+
+
+def test_create_account_generates_an_account_number_when_none_is_given() -> None:
+
+    account = create_account(holder_name="Ada Lovelace")
+
+    assert len(account.account_number) == 10
+    assert account.account_number.isdigit()
+
+
+def test_generated_account_number_retries_on_a_collision() -> None:
+
+    AccountFactory(account_number="1111111111")
+
+    with mock.patch("ledger.services.generate_account_number", side_effect=["1111111111", "2222222222"]):
+        account = create_account(holder_name="Ada Lovelace")
+
+    assert account.account_number == "2222222222"
+
+
+def test_post_transaction_generates_a_reference_when_none_is_given() -> None:
+    import re
+
+    transaction = post(AccountFactory(), reference_id="")
+
+    assert re.fullmatch(r"TXN-[A-Z0-9]{8}", transaction.reference_id)
+
+
+def test_generated_reference_retries_on_a_collision() -> None:
+
+    existing = TransactionFactory(reference_id="TXN-AAAAAAAA")
+
+    with mock.patch("ledger.services.generate_reference_id", side_effect=["TXN-AAAAAAAA", "TXN-BBBBBBBB"]):
+        transaction = post(existing.account, reference_id="")
+
+    assert transaction.reference_id == "TXN-BBBBBBBB"
+
+
+def test_generation_gives_up_after_repeated_collisions() -> None:
+
+    from ledger.services import GENERATION_ATTEMPTS, create_account
+
+    AccountFactory(account_number="1111111111")
+
+    with (
+        mock.patch("ledger.services.generate_account_number", return_value="1111111111") as generate,
+        pytest.raises(RuntimeError, match="Couldn't generate an unused value"),
+    ):
+        create_account(holder_name="Ada Lovelace")
+    assert generate.call_count == GENERATION_ATTEMPTS

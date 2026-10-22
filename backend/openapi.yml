@@ -7,8 +7,8 @@ paths:
   /api/accounts/:
     get:
       operationId: accounts_list
-      description: Accounts with their current balances. Search by external ID, name
-        or email, filter by `status`, and sort with `ordering` (for example `-balance`).
+      description: Accounts with their current balances. Search by account number,
+        name or email, filter by `status`, and sort with `ordering` (for example `-balance`).
       summary: List accounts
       parameters:
       - name: ordering
@@ -55,7 +55,8 @@ paths:
           description: Unexpected server error.
     post:
       operationId: accounts_create
-      description: New accounts always start OPEN, with a zero balance.
+      description: New accounts always start OPEN, with a zero balance. Leave out
+        `account_number` to have one generated.
       summary: Open an account
       tags:
       - Accounts
@@ -63,13 +64,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Account'
+              $ref: '#/components/schemas/AccountRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/Account'
+              $ref: '#/components/schemas/AccountRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/Account'
+              $ref: '#/components/schemas/AccountRequest'
         required: true
       security:
       - {}
@@ -132,7 +133,7 @@ paths:
       operationId: accounts_partial_update
       description: 'Change an account''s name, email or status. Set `status` to CLOSED
         to close it: closing is final, and a closed account can''t be changed (400).
-        `external_id` can''t be changed, and accounts are never deleted.'
+        `account_number` can''t be changed, and accounts are never deleted.'
       summary: Update an account
       parameters:
       - in: path
@@ -148,13 +149,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedAccountUpdate'
+              $ref: '#/components/schemas/PatchedAccountUpdateRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedAccountUpdate'
+              $ref: '#/components/schemas/PatchedAccountUpdateRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedAccountUpdate'
+              $ref: '#/components/schemas/PatchedAccountUpdateRequest'
       security:
       - {}
       responses:
@@ -247,8 +248,9 @@ paths:
           description: No object with this id.
     post:
       operationId: accounts_transactions_create
-      description: Post a transaction to the account. A closed account is a 400; a
-        duplicate `reference_id` is a 409.
+      description: Post a transaction to the account. Leave out `reference_id` to
+        have one generated. A closed account is a 400; a duplicate `reference_id`
+        is a 409.
       summary: Post a transaction
       parameters:
       - in: path
@@ -264,13 +266,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Transaction'
+              $ref: '#/components/schemas/TransactionRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/Transaction'
+              $ref: '#/components/schemas/TransactionRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/Transaction'
+              $ref: '#/components/schemas/TransactionRequest'
         required: true
       security:
       - {}
@@ -381,10 +383,10 @@ components:
           type: string
           format: uuid
           readOnly: true
-        external_id:
+        account_number:
           type: string
-          description: The account's ID in the source system (e.g. a customer number).
-            Unique, and can't change after create.
+          description: Unique, and can't change after create. Generated (10 random
+            digits) when left blank.
           maxLength: 32
         holder_name:
           type: string
@@ -418,11 +420,32 @@ components:
       required:
       - balance
       - created_at
-      - external_id
       - holder_name
       - id
       - status
       - updated_at
+    AccountRequest:
+      type: object
+      description: An account as the API returns it, and the body for creating one.
+      properties:
+        account_number:
+          type: string
+          description: Unique, and can't change after create. Generated (10 random
+            digits) when left blank.
+          maxLength: 32
+        holder_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        email:
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+      required:
+      - holder_name
     AccountStatusEnum:
       enum:
       - OPEN
@@ -524,13 +547,14 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Transaction'
-    PatchedAccountUpdate:
+    PatchedAccountUpdateRequest:
       type: object
-      description: The editable fields of an account. `external_id` can't change after
-        create.
+      description: The editable fields of an account. `account_number` can't change
+        after create.
       properties:
         holder_name:
           type: string
+          minLength: 1
           maxLength: 200
         email:
           oneOf:
@@ -567,8 +591,8 @@ components:
           format: date
         reference_id:
           type: string
-          description: The source system's ID. Unique per account, so reposting is
-            idempotent.
+          description: The source system's ID, unique per account, so reposting is
+            idempotent. Generated ("TXN-" and 8 letters or digits) when left blank.
           maxLength: 64
         description:
           type: string
@@ -583,10 +607,37 @@ components:
       - created_at
       - direction
       - id
-      - reference_id
       - transaction_date
     TransactionDirectionEnum:
       enum:
       - DEBIT
       - CREDIT
       type: string
+    TransactionRequest:
+      type: object
+      description: A transaction as the API returns it, and the body for posting one
+        (the account comes from the URL).
+      properties:
+        direction:
+          $ref: '#/components/schemas/TransactionDirectionEnum'
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: Always positive, at most 2 decimal places; the sign comes from
+            `direction`.
+        transaction_date:
+          type: string
+          format: date
+        reference_id:
+          type: string
+          description: The source system's ID, unique per account, so reposting is
+            idempotent. Generated ("TXN-" and 8 letters or digits) when left blank.
+          maxLength: 64
+        description:
+          type: string
+          maxLength: 255
+      required:
+      - amount
+      - direction
+      - transaction_date

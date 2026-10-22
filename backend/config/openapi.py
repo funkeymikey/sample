@@ -13,6 +13,9 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Accounts, transactions and bulk CSV imports.",
     "VERSION": "0.1.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    # Separate request and response types (e.g. `AccountRequest` vs `Account`), so request types only
+    # contain the fields a client may send.
+    "COMPONENT_SPLIT_REQUEST": True,
     "REDOC_DIST": REDOC_DIST_URL,
     "REDOC_UI_SETTINGS": {
         "expandResponses": "200",

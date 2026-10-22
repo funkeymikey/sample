@@ -31,6 +31,8 @@ Requests flow view → service → serializer:
 - Components use `<script setup lang="ts">` and the Composition API; no Options API
 - API types come from the generated schema (`components['schemas'][...]` via `@/api/client`); never hand-write a type for something the API returns — run `make api-types` after backend changes
 - All API calls go through `@/api/client`; components never call `fetch` directly
+- Views load data with the shared composables instead of hand-rolled `try`/`catch`: `useRecord` (one record by id: not-found and load errors), `usePagedList` (paginated lists: latest response wins, gone pages fall back to page 1, page size `API_PAGE_SIZE`) and `useApiForm` (saving state, field errors vs. form errors)
+- Every clickable table row also has a real link in one of its cells, so keyboard and screen-reader users can open it
 - Never use `any`; use `unknown` plus a type guard for data of unknown shape (e.g. parsed JSON)
 - Use string-literal union types (including the generated enum unions) instead of TypeScript `enum`, and never compare against a bare string when a union type exists
 - Type component props and emits with `defineProps<{...}>()` / `defineEmits<{...}>()`

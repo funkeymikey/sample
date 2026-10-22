@@ -1,21 +1,44 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+import PrimeVue from 'primevue/config'
+import ToastService from 'primevue/toastservice'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
 import App from '@/App.vue'
-import router from '@/router'
+import { routes } from '@/router'
+import { jsonResponse } from '@/testing'
 
-function jsonResponse(body: unknown, status: number) {
-  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+let router: Router
+
+/** Mount the app with its own router, so navigating in one test can't affect another. */
+async function mountApp() {
+  router = createRouter({ history: createMemoryHistory(), routes })
+  const wrapper = mount(App, { global: { plugins: [router, [PrimeVue, { theme: 'none' }], ToastService] } })
+  await flushPromises()
+  return wrapper
 }
 
 async function apiStatusShownFor(fetchResult: Promise<Response>) {
   vi.stubGlobal('fetch', vi.fn().mockReturnValue(fetchResult))
 
-  const wrapper = mount(App, { global: { plugins: [router] } })
-  await flushPromises()
+  const wrapper = await mountApp()
 
   return wrapper.get('[data-test="api-status"]').text()
 }
+
+describe('App layout', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('links the Ledger brand to the accounts list', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ status: 'ok' })))
+
+    const wrapper = await mountApp()
+
+    expect(wrapper.get('[data-test="home-link"]').attributes('href')).toBe('/accounts')
+  })
+})
 
 describe('App API status', () => {
   afterEach(() => {

@@ -20,13 +20,14 @@ TRANSACTIONS_TAG = "Transactions"
 @extend_schema_view(
     get=extend_schema(
         summary="List accounts",
-        description="Accounts with their current balances. Search by external ID, name or email, "
+        description="Accounts with their current balances. Search by account number, name or email, "
         "filter by `status`, and sort with `ordering` (for example `-balance`).",
         tags=[ACCOUNTS_TAG],
     ),
     post=extend_schema(
         summary="Open an account",
-        description="New accounts always start OPEN, with a zero balance.",
+        description="New accounts always start OPEN, with a zero balance. "
+        "Leave out `account_number` to have one generated.",
         tags=[ACCOUNTS_TAG],
     ),
 )
@@ -37,10 +38,10 @@ class AccountListView(generics.ListCreateAPIView):
     serializer_class = AccountSerializer
     filterset_class = AccountFilter
     filter_backends = [*generics.ListCreateAPIView.filter_backends, filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ["external_id", "holder_name", "email"]
-    ordering_fields = ["external_id", "holder_name", "balance", "created_at"]
+    search_fields = ["account_number", "holder_name", "email"]
+    ordering_fields = ["account_number", "holder_name", "balance", "created_at"]
     # Explicit, because Django drops Meta.ordering on aggregate queries like the balance.
-    ordering = ["external_id"]
+    ordering = ["account_number"]
 
     def perform_create(self, serializer: AccountSerializer) -> None:
         from ledger.services import create_account
@@ -63,7 +64,7 @@ class AccountDetailView(generics.RetrieveAPIView):
     @extend_schema(
         summary="Update an account",
         description="Change an account's name, email or status. Set `status` to CLOSED to close it: closing is "
-        "final, and a closed account can't be changed (400). `external_id` can't be changed, and accounts are "
+        "final, and a closed account can't be changed (400). `account_number` can't be changed, and accounts are "
         "never deleted.",
         request=AccountUpdateSerializer,
         responses={200: AccountSerializer},
@@ -88,8 +89,8 @@ class AccountDetailView(generics.RetrieveAPIView):
     ),
     post=extend_schema(
         summary="Post a transaction",
-        description="Post a transaction to the account. A closed account is a 400; a duplicate `reference_id` "
-        "is a 409.",
+        description="Post a transaction to the account. Leave out `reference_id` to have one generated. "
+        "A closed account is a 400; a duplicate `reference_id` is a 409.",
         responses={201: TransactionSerializer, 409: DUPLICATE_REFERENCE_RESPONSE},
         tags=[TRANSACTIONS_TAG],
     ),

@@ -26,7 +26,7 @@ def test_list_returns_accounts_with_their_own_balances(api_client: APIClient, dj
     assert balances == {str(saver.pk): "25.99", str(spender.pk): "-60.00", str(untouched.pk): "0.00"}
     assert set(body["results"][0]) == {
         "id",
-        "external_id",
+        "account_number",
         "holder_name",
         "email",
         "status",
@@ -62,22 +62,24 @@ def test_list_is_paginated(api_client: APIClient) -> None:
 def test_list_searches_and_filters(api_client: APIClient) -> None:
     from ledger.models import AccountStatus
 
-    AccountFactory(external_id="ACCT1", holder_name="Ada Lovelace", email="ada@example.com")
-    AccountFactory(external_id="ACCT2", holder_name="Grace Hopper", email="grace@navy.mil", status=AccountStatus.CLOSED)
+    AccountFactory(account_number="ACCT1", holder_name="Ada Lovelace", email="ada@example.com")
+    AccountFactory(
+        account_number="ACCT2", holder_name="Grace Hopper", email="grace@navy.mil", status=AccountStatus.CLOSED
+    )
 
-    def external_ids(params: dict[str, str]) -> list[str]:
-        return [account["external_id"] for account in api_client.get("/api/accounts/", params).json()["results"]]
+    def account_numbers(params: dict[str, str]) -> list[str]:
+        return [account["account_number"] for account in api_client.get("/api/accounts/", params).json()["results"]]
 
-    assert external_ids({"search": "lovelace"}) == ["ACCT1"]  # holder name, case-insensitive
-    assert external_ids({"search": "acct2"}) == ["ACCT2"]  # external id
-    assert external_ids({"search": "navy.mil"}) == ["ACCT2"]  # email
-    assert external_ids({"status": "CLOSED"}) == ["ACCT2"]
+    assert account_numbers({"search": "lovelace"}) == ["ACCT1"]  # holder name, case-insensitive
+    assert account_numbers({"search": "acct2"}) == ["ACCT2"]  # external id
+    assert account_numbers({"search": "navy.mil"}) == ["ACCT2"]  # email
+    assert account_numbers({"status": "CLOSED"}) == ["ACCT2"]
 
 
 def test_create_account(api_client: APIClient) -> None:
     response = api_client.post(
         "/api/accounts/",
-        {"external_id": "ACCT9", "holder_name": "Ada Lovelace", "status": "CLOSED"},
+        {"account_number": "ACCT9", "holder_name": "Ada Lovelace", "status": "CLOSED"},
         format="json",
     )
 
@@ -89,20 +91,30 @@ def test_create_account(api_client: APIClient) -> None:
     assert body["email"] == ""
     assert body["balance"] == "0.00"
     saved = Account.objects.get(pk=body["id"])
-    assert (saved.external_id, saved.holder_name, saved.status) == ("ACCT9", "Ada Lovelace", "OPEN")
+    assert (saved.account_number, saved.holder_name, saved.status) == ("ACCT9", "Ada Lovelace", "OPEN")
+
+
+def test_create_account_generates_an_account_number_when_left_out(api_client: APIClient) -> None:
+    without = api_client.post("/api/accounts/", {"holder_name": "Ada Lovelace"}, format="json")
+    blank = api_client.post("/api/accounts/", {"holder_name": "Grace Hopper", "account_number": ""}, format="json")
+
+    assert without.status_code == blank.status_code == 201
+    numbers = [without.json()["account_number"], blank.json()["account_number"]]
+    assert all(len(number) == 10 and number.isdigit() for number in numbers)
+    assert numbers[0] != numbers[1]
 
 
 def test_create_account_validates_input(api_client: APIClient) -> None:
-    AccountFactory(external_id="ACCT1")
+    AccountFactory(account_number="ACCT1")
 
-    duplicate = api_client.post("/api/accounts/", {"external_id": "ACCT1", "holder_name": "X"}, format="json")
+    duplicate = api_client.post("/api/accounts/", {"account_number": "ACCT1", "holder_name": "X"}, format="json")
     missing = api_client.post("/api/accounts/", {"email": "not-an-email"}, format="json")
 
     assert_documented_error(duplicate)
     assert duplicate.status_code == 400
-    assert "external_id" in duplicate.json()["error"]["fields"]
+    assert "account_number" in duplicate.json()["error"]["fields"]
     assert missing.status_code == 400
-    assert set(missing.json()["error"]["fields"]) == {"external_id", "holder_name", "email"}
+    assert set(missing.json()["error"]["fields"]) == {"holder_name", "email"}  # account_number is optional
 
 
 def test_retrieve_account(api_client: APIClient) -> None:
@@ -123,19 +135,19 @@ def test_unknown_account_is_a_json_404(api_client: APIClient, account_id: str) -
     assert response.status_code == 404
 
 
-def test_patch_updates_fields_but_not_external_id(api_client: APIClient) -> None:
-    account = AccountFactory(external_id="ACCT1")
+def test_patch_updates_fields_but_not_account_number(api_client: APIClient) -> None:
+    account = AccountFactory(account_number="ACCT1")
 
     response = api_client.patch(
-        f"/api/accounts/{account.pk}/", {"holder_name": "New Name", "external_id": "ACCT2"}, format="json"
+        f"/api/accounts/{account.pk}/", {"holder_name": "New Name", "account_number": "ACCT2"}, format="json"
     )
 
     assert response.status_code == 200
     assert response.json()["holder_name"] == "New Name"
-    assert response.json()["external_id"] == "ACCT1"
+    assert response.json()["account_number"] == "ACCT1"
     assert response.json()["balance"] == "0.00"
     account.refresh_from_db()
-    assert (account.holder_name, account.external_id) == ("New Name", "ACCT1")
+    assert (account.holder_name, account.account_number) == ("New Name", "ACCT1")
 
 
 @pytest.mark.parametrize(

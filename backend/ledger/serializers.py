@@ -17,13 +17,15 @@ class AccountSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Account
-        fields = ["id", "external_id", "holder_name", "email", "status", "balance", "created_at", "updated_at"]
+        fields = ["id", "account_number", "holder_name", "email", "status", "balance", "created_at", "updated_at"]
         # Everything else is input. New accounts always start OPEN, so `status` is read-only here.
         read_only_fields = ["id", "status", "balance", "created_at", "updated_at"]
+        # Optional: the service generates one when it's left out or blank.
+        extra_kwargs = {"account_number": {"required": False, "allow_blank": True}}
 
 
 class AccountUpdateSerializer(serializers.ModelSerializer):
-    """The editable fields of an account. `external_id` can't change after create."""
+    """The editable fields of an account. `account_number` can't change after create."""
 
     class Meta:
         model = Account
@@ -54,5 +56,7 @@ class TransactionSerializer(serializers.ModelSerializer):
         ]
         # Everything else is input. The account comes from the URL.
         read_only_fields = ["id", "account", "created_at"]
+        # Optional: the service generates one when it's left out or blank.
+        extra_kwargs = {"reference_id": {"required": False, "allow_blank": True}}
         # Duplicate reference_ids are rejected by the service as a 409, not here as a 400.
         validators: list = []
