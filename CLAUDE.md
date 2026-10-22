@@ -21,6 +21,7 @@ Requests flow view → service → serializer:
 - **Views are thin:** validate input with a serializer, call a service, and wrap the result in `Response(...)`. No business logic, and no `try`/`except` to build error responses
 - **Services hold the business logic** in `<app>/services.py`: plain functions that know nothing about HTTP. They return plain values or model instances, and raise `core.exceptions` errors for rule violations (`ApiError` for a 400, `ConflictError` for a 409)
 - **Serializers shape data** in and out; field-level validation lives there
+- **Nothing is deleted:** every foreign key uses `on_delete=models.PROTECT`, never `CASCADE`; records are closed or kept, not removed
 - **Tests live with their app** in `<app>/tests/` (a package with `__init__.py`), named `test_*.py`
 - **Don't catch unexpected errors:** let them propagate to `core.exceptions.api_exception_handler`, which logs them and returns the standard `{"error": {...}}` 500. All error responses come from the handler
 - **API docs:** `core.schema.ApiAutoSchema` adds the standard error responses automatically (500 everywhere, 400 on writes, 404 on single-object paths); use `@extend_schema` only for success responses and unusual codes (e.g. a 409)

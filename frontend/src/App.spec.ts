@@ -40,6 +40,28 @@ describe('App layout', () => {
   })
 })
 
+describe('App navigation', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('links to both sections, highlighting the current one', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ count: 0, next: null, previous: null, results: [] })),
+    )
+    const wrapper = await mountApp()
+
+    await router.push('/imports')
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="nav-accounts"]').attributes('href')).toBe('/accounts')
+    expect(wrapper.get('[data-test="nav-imports"]').attributes('href')).toBe('/imports')
+    expect(wrapper.get('[data-test="nav-imports"]').classes()).toContain('active')
+    expect(wrapper.get('[data-test="nav-accounts"]').classes()).not.toContain('active')
+  })
+})
+
 describe('App API status', () => {
   afterEach(() => {
     vi.unstubAllGlobals()

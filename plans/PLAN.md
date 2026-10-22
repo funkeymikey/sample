@@ -48,6 +48,10 @@ ImportBatch (BaseModel)
   error_count       int
   completed_at      datetime, nullable
 
+ImportFile (BaseModel)                 # the uploaded file, byte for byte, for auditing; its own table so
+  batch             1:1 -> ImportBatch # listing imports never loads file contents
+  content           binary             # at most 5 MB
+
 ImportRowError (BaseModel)
   batch             FK -> ImportBatch
   row_number        int
@@ -76,22 +80,22 @@ The account **balance** is computed (credits minus debits: positive is money hel
 ### Bulk upload (all-or-nothing)
 
 - Upload a CSV of transactions with the columns `account_number, direction, amount, transaction_date, reference_id, description`. Unlike the form, imports require `reference_id`: re-importing the same file must not post anything twice.
-- Limits: 5 MB and 10,000 rows. Larger files are rejected up front with a clear error, and no batch is created.
+- Problems with the file itself (over 5 MB or 10,000 rows, not UTF-8, malformed, empty, missing a required column) are a 400 with a clear message, and no batch is created. Unknown columns are ignored; header names are case-insensitive, Excel's byte order mark is handled, and blank rows (including the comma-only rows spreadsheets export) are skipped. Errors report each row's real line in the file.
 - The pipeline has four steps:
   1. **Parse** the file. It fails fast if the file is malformed or headers are missing.
   2. **Validate every row** and collect all errors, rather than stopping at the first one. Validation reuses the same DRF serializer as single-record create, so there's one source of truth.
      - Checks: the account exists and is not CLOSED, the direction is DEBIT or CREDIT, the amount is a positive decimal with at most 2 decimal places (anything more is rejected, never rounded), the date is valid, and the reference_id is not a duplicate within the file or in the DB.
      - Accounts and existing reference_ids are each prefetched in a single query, so validation doesn't query the DB once per row.
   3. **If any row fails**, the batch is marked FAILED, the row errors are saved, and **nothing is inserted**.
-  4. **If every row passes**, all rows are inserted with `bulk_create` inside one `transaction.atomic()` block, and the batch is marked COMPLETED. If two uploads race on the same reference_id, the DB unique constraint raises an `IntegrityError`, the insert rolls back, and the batch is marked FAILED.
-- Results page: summary counts, a table of row errors, and a download of the error rows as CSV so the user can fix and re-upload.
+  4. **If every row passes**, a short `transaction.atomic()` block re-checks and inserts. Validation runs before it, with no transaction or locks, so slow validation never blocks other requests. Inside the block, the file's still-open accounts are locked (`SELECT … FOR UPDATE`, in a fixed order) and their references are checked again. If an account closed or a reference was taken since validation, those rows fail the import as usual. Otherwise all rows are inserted with `bulk_create` and the batch is marked COMPLETED. Concurrent imports and posts to the same accounts take turns only during this short block. Measured on 10,000 rows: about 1.5 seconds of validation without locks, then locks held for about 0.45 seconds.
+- Results page: a download of the original file exactly as uploaded (`GET /api/imports/{id}/file/`), summary counts, a table of row errors (by line in the file; the header is line 1), and a download of the error rows as CSV, with the original columns plus an `errors` column, so the user can fix them in place and re-upload the same file.
 
 ### Download sample file
 
 - An **"Download sample file"** button on the upload page.
-- The file is generated on the fly by `GET /api/imports/sample/?rows=25`. It uses real account numbers from the DB, a mix of debits and credits, plus fresh unique `reference_id`s. That way the file passes validation and uploads successfully as-is, which makes the demo work end to end.
+- The file is generated on the fly by `GET /api/imports/sample.csv?rows=25` (1 to 1,000 rows). It uses real account numbers from the DB, a mix of debits and credits, plus fresh unique `reference_id`s. That way the file passes validation and uploads successfully as-is, which makes the demo work end to end.
 - `?invalid=true` produces a file with a few deliberate errors (an unknown account, a negative amount, a bad date, a duplicate reference), to demo the failure path.
-- If there are no accounts in the DB, the endpoint returns a clear error telling the user to create accounts or run `seed_demo`.
+- If there are no open accounts, the endpoint returns a clear 400 telling the user to open one first.
 - Static copies of both files are also committed in `samples/` for the README and tests.
 
 ### Sync vs. async (Celery)
@@ -113,11 +117,12 @@ GET/POST           /api/accounts/
 GET/PATCH          /api/accounts/{id}/
 GET/POST           /api/accounts/{id}/transactions/   (list or post; the account comes from the URL)
 GET                /api/transactions/{id}/
-POST               /api/imports/              (multipart: file)
-GET                /api/imports/
+GET/POST           /api/imports/              (list, or upload a CSV as multipart `file`)
 GET                /api/imports/{id}/
-GET                /api/imports/{id}/errors/  (?format=csv)
-GET                /api/imports/sample/       (?rows=N&invalid=true)
+GET                /api/imports/{id}/errors/  (paginated row errors)
+GET                /api/imports/{id}/errors.csv
+GET                /api/imports/{id}/file/    (the original upload, byte for byte)
+GET                /api/imports/sample.csv    (?rows=N&invalid=true)
 ```
 
 - OpenAPI schema with drf-spectacular, Redoc at `/api/docs/`.
@@ -231,8 +236,8 @@ The README is written in Milestone 1 so setup instructions exist from day one. I
 2. **Core** (done): abstract `BaseModel` (UUID primary key, timestamps) with tests.
 3. **Domain + API** (done): `ledger` app with Account and Transaction models, migration, services, DRF endpoints and tests. Transactions are listed and posted under their account (`/api/accounts/{id}/transactions/`); there's no all-transactions list. Posting to or editing a closed account is a 400; reposting a `reference_id` (a genuine clash) is a 409. Services lock the account row, so concurrent requests can't bypass the closed-account rule.
 4. **Frontend CRUD** (done): accounts list (server-side paging, search, status filter, sorting), account detail with its transactions (direction and date filters) and close-with-confirmation, account form (open and edit), transaction form, transaction detail. API field errors show next to their fields; tests sit beside each view. Search, filters, sort and page live in the URL (e.g. `/accounts?status=CLOSED&ordering=-balance&page=2`, `/accounts/{id}?direction=DEBIT&from=2026-09-01`), so refresh, shared links and Back restore them; invalid values are ignored, and a page that no longer exists falls back to page 1.
-5. **Bulk upload backend**: parser, validation, bulk insert, error report, sample file generator, tests.
-6. **Bulk upload frontend**: upload, sample download, results, history.
+5. **Bulk upload backend** (done): `imports` app with ImportBatch and ImportRowError, `Transaction.import_batch`, parser, all-or-nothing validation reusing the transaction serializer, lock-free validation then a short locked re-check and bulk insert, error CSV, sample file generator, tests.
+6. **Bulk upload frontend** (done): upload (drop zone, column guide, sample downloads), results (summary, row errors, error CSV), history; header nav for Accounts and Imports.
 7. **Polish**: seed command, static sample files, README, screenshots.
 
 ---

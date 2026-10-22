@@ -1,12 +1,17 @@
 <script setup lang="ts">
 import Toast from 'primevue/toast'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 
 import { ApiError, getHealth, type Health } from '@/api/client'
 
 type ApiStatus = Health['status'] | 'checking…' | 'error' | 'unreachable'
 
 const apiStatus = ref<ApiStatus>('checking…')
+
+// Accounts and their transactions are one section, imports the other.
+const route = useRoute()
+const section = computed(() => (route.path.startsWith('/imports') ? 'imports' : 'accounts'))
 
 onMounted(async () => {
   try {
@@ -25,6 +30,14 @@ onMounted(async () => {
         <img src="/icons8-money-box-ios-27-filled-32.png" alt="" width="20" height="20" />
         Ledger
       </RouterLink>
+      <nav class="app-nav">
+        <RouterLink to="/accounts" :class="{ active: section === 'accounts' }" data-test="nav-accounts"
+          >Accounts</RouterLink
+        >
+        <RouterLink to="/imports" :class="{ active: section === 'imports' }" data-test="nav-imports"
+          >Imports</RouterLink
+        >
+      </nav>
       <span class="api-status" :class="`api-status--${apiStatus === 'ok' ? 'ok' : 'problem'}`" title="API status">
         <span class="api-status-dot" aria-hidden="true"></span>
         API <span data-test="api-status">{{ apiStatus }}</span>
@@ -65,6 +78,26 @@ onMounted(async () => {
 
 .brand:hover {
   text-decoration: none;
+}
+
+.app-nav {
+  display: flex;
+  gap: 1.25rem;
+}
+
+.app-nav a {
+  font-size: 0.9rem;
+  color: var(--p-text-muted-color);
+}
+
+.app-nav a:hover {
+  color: var(--p-text-color);
+  text-decoration: none;
+}
+
+.app-nav a.active {
+  color: var(--p-text-color);
+  font-weight: 500;
 }
 
 .api-status {

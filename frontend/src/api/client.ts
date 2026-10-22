@@ -13,6 +13,11 @@ export type Transaction = Schemas['Transaction']
 export type TransactionRequest = Schemas['TransactionRequest']
 export type TransactionDirection = Schemas['TransactionDirectionEnum']
 export type TransactionPage = Schemas['PaginatedTransactionList']
+export type ImportBatch = Schemas['ImportBatch']
+export type ImportStatus = Schemas['ImportStatusEnum']
+export type ImportBatchPage = Schemas['PaginatedImportBatchList']
+export type ImportRowError = Schemas['ImportRowError']
+export type ImportRowErrorPage = Schemas['PaginatedImportRowErrorList']
 export type TransactionListParams = NonNullable<paths['/api/accounts/{id}/transactions/']['get']['parameters']['query']>
 
 /** Rows per page in every paginated list. Must match `PAGE_SIZE` in the backend's REST_FRAMEWORK settings. */
@@ -62,6 +67,8 @@ async function request<T>(
   path: string,
   options: { query?: Record<string, QueryValue>; body?: unknown } = {},
 ): Promise<T> {
+  // A FormData body (a file upload) is sent as-is: the browser sets the multipart Content-Type and boundary.
+  const isFormData = options.body instanceof FormData
   const query = new URLSearchParams()
   for (const [name, value] of Object.entries(options.query ?? {})) {
     if (value !== null && value !== undefined && value !== '') {
@@ -72,8 +79,8 @@ async function request<T>(
   const hasBody = options.body !== undefined
   const response = await fetch(`/api${path}${queryString}`, {
     method,
-    headers: { Accept: 'application/json', ...(hasBody ? { 'Content-Type': 'application/json' } : {}) },
-    body: hasBody ? JSON.stringify(options.body) : undefined,
+    headers: { Accept: 'application/json', ...(hasBody && !isFormData ? { 'Content-Type': 'application/json' } : {}) },
+    body: isFormData ? (options.body as FormData) : hasBody ? JSON.stringify(options.body) : undefined,
   })
   const body = await response.json().catch(() => null)
   if (!response.ok) {
@@ -120,4 +127,44 @@ export function postTransaction(accountId: string, transaction: TransactionReque
 /** One transaction. */
 export function getTransaction(transactionId: string): Promise<Transaction> {
   return request<Transaction>('GET', `/transactions/${transactionId}/`)
+}
+
+/** One page of CSV imports, newest first. */
+export function listImports(params: { page?: number }): Promise<ImportBatchPage> {
+  return request<ImportBatchPage>('GET', '/imports/', { query: params })
+}
+
+/** One CSV import: its status and row counts. */
+export function getImport(importId: string): Promise<ImportBatch> {
+  return request<ImportBatch>('GET', `/imports/${importId}/`)
+}
+
+/** One page of a failed import's invalid rows. */
+export function listImportErrors(importId: string, params: { page?: number }): Promise<ImportRowErrorPage> {
+  return request<ImportRowErrorPage>('GET', `/imports/${importId}/errors/`, { query: params })
+}
+
+/**
+ * Upload a CSV file of transactions. Resolves with the new import, COMPLETED or FAILED; throws `ApiError`
+ * when the file itself can't be imported (too big, not CSV, missing columns).
+ */
+export function uploadImport(file: File): Promise<ImportBatch> {
+  const body = new FormData()
+  body.append('file', file)
+  return request<ImportBatch>('POST', '/imports/', { body })
+}
+
+/** Where to download a failed import's invalid rows as a CSV, to fix and upload again. */
+export function importErrorsCsvUrl(importId: string): string {
+  return `/api/imports/${importId}/errors.csv`
+}
+
+/** Where to download an import's original file, exactly as it was uploaded. */
+export function importFileUrl(importId: string): string {
+  return `/api/imports/${importId}/file/`
+}
+
+/** Where to download a sample CSV that imports cleanly, or with `invalid`, one with deliberate errors. */
+export function sampleFileUrl({ invalid = false } = {}): string {
+  return `/api/imports/sample.csv${invalid ? '?invalid=true' : ''}`
 }

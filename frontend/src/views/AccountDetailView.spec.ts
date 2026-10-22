@@ -113,6 +113,23 @@ describe('AccountDetailView', () => {
     expect(wrapper.find('[data-test="closed-notice"]').exists()).toBe(true)
   })
 
+  it('keeps the account open and explains why when closing fails', async () => {
+    stubApi({
+      [`GET ${ACCOUNT_URL}`]: () => jsonResponse(accountData()),
+      [`GET ${TRANSACTIONS_URL}`]: () => jsonResponse(page([])),
+      [`PATCH ${ACCOUNT_URL}`]: () => errorResponse(500, 'INTERNAL_ERROR', 'An error occurred.'),
+    })
+    const { wrapper } = await mountRoute(`/accounts/${ACCOUNT_ID}`)
+
+    await wrapper.get('[data-test="close-account"]').trigger('click')
+    await wrapper.get('[data-test="confirm-close"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="toast"]').text()).toContain("Couldn't close the account")
+    expect(wrapper.get('[data-test="toast"]').text()).toContain('An error occurred.')
+    expect(wrapper.get('[data-test="account-status"]').text()).toBe('Open')
+  })
+
   it('offers posting and editing only while the account is open', async () => {
     stubAccount(accountData({ status: 'OPEN' }))
     const { wrapper: openWrapper } = await mountRoute(`/accounts/${ACCOUNT_ID}`)

@@ -30,6 +30,7 @@ SPECTACULAR_SETTINGS = {
         "ErrorTypeEnum": "core.exceptions.ErrorType",
         "AccountStatusEnum": "ledger.models.AccountStatus",
         "TransactionDirectionEnum": "ledger.models.TransactionDirection",
+        "ImportStatusEnum": "imports.models.ImportStatus",
     },
     # Enums list exactly the values callers may send; a field's nullability is expressed by the field.
     "ENUM_ADD_EXPLICIT_BLANK_NULL_CHOICE": False,

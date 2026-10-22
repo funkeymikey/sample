@@ -76,6 +76,14 @@ class Transaction(BaseModel):
         'Generated ("TXN-" and 8 letters or digits) when left blank.',
     )
     description = models.CharField(max_length=255, blank=True)
+    import_batch = models.ForeignKey(
+        "imports.ImportBatch",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="transactions",
+        help_text="The CSV import that posted this transaction, if any.",
+    )
 
     class Meta:
         ordering = ["-transaction_date", "-created_at"]

@@ -9,7 +9,11 @@ import {
   listAccounts,
   listAccountTransactions,
   postTransaction,
+  importErrorsCsvUrl,
+  importFileUrl,
+  sampleFileUrl,
   updateAccount,
+  uploadImport,
 } from '@/api/client'
 import { errorResponse, jsonResponse, lastQuery, requestBody, stubApi } from '@/testing'
 
@@ -71,6 +75,27 @@ describe('API client', () => {
     expect(error).toBeInstanceOf(ApiError)
     expect((error as ApiError).status).toBe(404)
     expect((error as ApiError).errorResponse?.error.message).toBe('Not found.')
+  })
+})
+
+describe('imports', () => {
+  it('uploads the file as multipart form data, not JSON', async () => {
+    const fetchMock = stubApi({ 'POST /api/imports/': () => jsonResponse({ id: 'batch' }, 201) })
+    const file = new File(['account_number,direction\n'], 'september.csv', { type: 'text/csv' })
+
+    await uploadImport(file)
+
+    const init = fetchMock.mock.calls[0]![1]!
+    expect(init.body).toBeInstanceOf(FormData)
+    expect((init.body as FormData).get('file')).toBe(file)
+    expect(new Headers(init.headers).has('Content-Type')).toBe(false) // the browser sets the multipart boundary
+  })
+
+  it('builds download links for files the browser saves', () => {
+    expect(importErrorsCsvUrl('batch')).toBe('/api/imports/batch/errors.csv')
+    expect(importFileUrl('batch')).toBe('/api/imports/batch/file/')
+    expect(sampleFileUrl()).toBe('/api/imports/sample.csv')
+    expect(sampleFileUrl({ invalid: true })).toBe('/api/imports/sample.csv?invalid=true')
   })
 })
 

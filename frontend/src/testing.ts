@@ -1,11 +1,12 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { defineComponent } from 'vue'
+import { defineComponent, h } from 'vue'
 import PrimeVue from 'primevue/config'
+import Toast from 'primevue/toast'
 import ToastService from 'primevue/toastservice'
 import { vi } from 'vitest'
 import { createMemoryHistory, createRouter, type RouteComponent, type RouteRecordRaw, RouterView } from 'vue-router'
 
-import type { Account, Transaction } from '@/api/client'
+import type { Account, ImportBatch, ImportRowError, Transaction } from '@/api/client'
 import { routes } from '@/router'
 
 type Handler = (url: URL, init: RequestInit) => Response | Promise<Response>
@@ -79,14 +80,19 @@ async function eagerRoutes(): Promise<RouteRecordRaw[]> {
 }
 
 /**
- * Render the app's router at `path`, with PrimeVue installed, and wait for the page's requests to settle.
+ * Render the app's router at `path` (with a toast area), with PrimeVue installed, and wait for the page's
+ * requests to settle.
  * Dialogs render in place (no teleport), so their buttons can be found like any other element.
  */
 export async function mountRoute(path: string) {
   const router = createRouter({ history: createMemoryHistory(), routes: await eagerRoutes() })
   await router.push(path)
   await router.isReady()
-  const wrapper = mount(RouterView, {
+  // The page plus a toast area (as App renders), so tests can check toast messages via `[data-test="toast"]`.
+  const page = defineComponent({
+    render: () => [h(Toast, { pt: { message: { 'data-test': 'toast' } } }), h(RouterView)],
+  })
+  const wrapper = mount(page, {
     global: { plugins: [router, [PrimeVue, { theme: 'none' }], ToastService], stubs: { teleport: true } },
   })
   await flushPromises()
@@ -121,6 +127,7 @@ export function transactionData(overrides: Partial<Transaction> = {}): Transacti
     transaction_date: '2026-09-01',
     reference_id: 'REF-1',
     description: 'Paycheck',
+    import_batch: null,
     created_at: '2026-09-01T12:00:00Z',
     ...overrides,
   }
@@ -152,4 +159,37 @@ export function withSetup<T>(composable: () => T): T {
     }),
   )
   return result
+}
+
+export const IMPORT_ID = '33333333-3333-3333-3333-333333333333'
+
+/** An import batch as the API returns it. */
+export function importData(overrides: Partial<ImportBatch> = {}): ImportBatch {
+  return {
+    id: IMPORT_ID,
+    original_filename: 'september.csv',
+    status: 'COMPLETED',
+    row_count: 3,
+    error_count: 0,
+    created_at: '2026-09-01T12:00:00Z',
+    completed_at: '2026-09-01T12:00:01Z',
+    ...overrides,
+  }
+}
+
+/** One invalid row of a failed import, as the API returns it. */
+export function rowErrorData(overrides: Partial<ImportRowError> = {}): ImportRowError {
+  return {
+    row_number: 2,
+    raw_data: {
+      account_number: '9999',
+      direction: 'CREDIT',
+      amount: '10.00',
+      transaction_date: '2026-09-01',
+      reference_id: 'REF-1',
+      description: '',
+    },
+    errors: { account_number: ['No account with this number.'] },
+    ...overrides,
+  }
 }

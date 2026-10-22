@@ -28,6 +28,14 @@ export const routes: RouteRecordRaw[] = [
     component: () => import('@/views/TransactionDetailView.vue'),
     props: true,
   },
+  { path: '/imports', name: 'imports', component: () => import('@/views/ImportListView.vue') },
+  { path: '/imports/new', name: 'import-new', component: () => import('@/views/ImportUploadView.vue') },
+  {
+    path: '/imports/:id',
+    name: 'import',
+    component: () => import('@/views/ImportDetailView.vue'),
+    props: true,
+  },
   { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('@/views/NotFoundView.vue') },
 ]
 

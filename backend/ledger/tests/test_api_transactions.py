@@ -45,6 +45,7 @@ def test_create_transaction(api_client: APIClient) -> None:
         "transaction_date",
         "reference_id",
         "description",
+        "import_batch",
         "created_at",
     }
 

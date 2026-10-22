@@ -52,10 +52,11 @@ class TransactionSerializer(serializers.ModelSerializer):
             "transaction_date",
             "reference_id",
             "description",
+            "import_batch",
             "created_at",
         ]
         # Everything else is input. The account comes from the URL.
-        read_only_fields = ["id", "account", "created_at"]
+        read_only_fields = ["id", "account", "import_batch", "created_at"]
         # Optional: the service generates one when it's left out or blank.
         extra_kwargs = {"reference_id": {"required": False, "allow_blank": True}}
         # Duplicate reference_ids are rejected by the service as a 409, not here as a 400.

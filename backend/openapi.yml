@@ -336,6 +336,262 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Unexpected server error.
+  /api/imports/:
+    get:
+      operationId: imports_list
+      description: Uploaded CSV files, newest first.
+      summary: List imports
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - Imports
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedImportBatchList'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected server error.
+    post:
+      operationId: imports_create
+      description: 'All-or-nothing: if every row is valid, every row is posted (status
+        COMPLETED); if any row is invalid, nothing is posted (status FAILED) and the
+        row errors are saved. Either way the new import is returned with a 201. Problems
+        with the file itself (too big, not CSV, missing columns) are a 400, and no
+        import is created.'
+      summary: Upload a CSV of transactions
+      tags:
+      - Imports
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ImportUploadRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportBatch'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected server error.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request data is invalid.
+  /api/imports/{id}/:
+    get:
+      operationId: imports_retrieve
+      description: 'One CSV import: its status and row counts.'
+      summary: Get an import
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this import batch.
+        required: true
+      tags:
+      - Imports
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportBatch'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected server error.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No object with this id.
+  /api/imports/{id}/errors/:
+    get:
+      operationId: imports_errors_list
+      description: Each invalid row of a failed import, with its line in the file
+        (the header is line 1).
+      summary: List an import's row errors
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this import row error.
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - Imports
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedImportRowErrorList'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected server error.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No object with this id.
+  /api/imports/{id}/errors.csv:
+    get:
+      operationId: imports_errors.csv_retrieve
+      description: 'The invalid rows with their original columns plus an `errors`
+        column. Fix them in place and upload the file again: unknown columns like
+        `errors` are ignored.'
+      summary: Download an import's row errors as CSV
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Imports
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            text/csv:
+              schema:
+                type: string
+          description: A CSV file, sent as a download.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected server error.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No object with this id.
+  /api/imports/{id}/file/:
+    get:
+      operationId: imports_file_retrieve
+      description: The file exactly as it was uploaded, for auditing. A 404 for imports
+        from before files were kept.
+      summary: Download an import's original file
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Imports
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            text/csv:
+              schema:
+                type: string
+          description: A CSV file, sent as a download.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected server error.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No object with this id.
+  /api/imports/sample.csv:
+    get:
+      operationId: imports_sample.csv_retrieve
+      description: A file of transactions for real open accounts that imports cleanly,
+        or, with `invalid=true`, one with a few deliberate errors. A 400 if there
+        are no open accounts.
+      summary: Download a sample CSV
+      parameters:
+      - in: query
+        name: invalid
+        schema:
+          type: boolean
+          default: false
+        description: Include a few deliberately invalid rows.
+      - in: query
+        name: rows
+        schema:
+          type: integer
+          maximum: 1000
+          minimum: 1
+          default: 25
+      tags:
+      - Imports
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            text/csv:
+              schema:
+                type: string
+          description: A CSV file, sent as a download.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected server error.
   /api/transactions/{id}/:
     get:
       operationId: transactions_retrieve
@@ -501,6 +757,81 @@ components:
       enum:
       - ok
       type: string
+    ImportBatch:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        original_filename:
+          type: string
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/ImportStatusEnum'
+          readOnly: true
+        row_count:
+          type: integer
+          readOnly: true
+        error_count:
+          type: integer
+          readOnly: true
+          description: How many rows had errors.
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        completed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - completed_at
+      - created_at
+      - error_count
+      - id
+      - original_filename
+      - row_count
+      - status
+    ImportRowError:
+      type: object
+      properties:
+        row_number:
+          type: integer
+          readOnly: true
+          description: The line in the file (the header is line 1).
+        raw_data:
+          type: object
+          additionalProperties:
+            type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+      required:
+      - errors
+      - raw_data
+      - row_number
+    ImportStatusEnum:
+      enum:
+      - PROCESSING
+      - COMPLETED
+      - FAILED
+      type: string
+    ImportUploadRequest:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+          description: A CSV file of transactions (UTF-8, at most 5 MB and 10,000
+            rows).
+      required:
+      - file
     PaginatedAccountList:
       type: object
       required:
@@ -524,6 +855,52 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Account'
+    PaginatedImportBatchList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportBatch'
+    PaginatedImportRowErrorList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportRowError'
     PaginatedTransactionList:
       type: object
       required:
@@ -597,6 +974,12 @@ components:
         description:
           type: string
           maxLength: 255
+        import_batch:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+          description: The CSV import that posted this transaction, if any.
         created_at:
           type: string
           format: date-time
@@ -607,6 +990,7 @@ components:
       - created_at
       - direction
       - id
+      - import_batch
       - transaction_date
     TransactionDirectionEnum:
       enum:
